@@ -1,5 +1,5 @@
-import json, logging, unittest
-from processors import Processor, cc, sc
+import json, logging
+from processors import Processor, cc, sc, BadRequest
 
 import os
 
@@ -78,7 +78,7 @@ class RequestHandler:
             log.debug('request: {}'.format(request))
             try:
                 code, data = self.unpack_req(request)
-            except json.JSONDecodeError:
+            except ValueError:
                 log.error('failed to decode request {}'.format(request))
                 print('\nDecode Error\n')
                 continue
@@ -92,7 +92,7 @@ class RequestHandler:
                     log.error('IP address in the request does not match the actual one, ignoring request')
                     continue
                 response = handler(*data)
-            except (TypeError, BadRequest):
+            except (TypeError, IndexError, BadRequest):
                 log.error('bad request from {}: {}'.format(address, request))
                 print('Bad Request\n')
                 continue
