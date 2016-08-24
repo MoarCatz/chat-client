@@ -1,8 +1,15 @@
-import unittest
+import os
+
+for i in os.listdir('data'):
+    os.remove('data/' + i)
+
+import unittest, time
 from processors import *
 from request_handler import RequestHandler
 from hashlib import md5
 from installer import Installer
+
+Installer.install()
 
 class TestProcessor(unittest.TestCase):
     rh = RequestHandler()
@@ -17,25 +24,23 @@ class TestProcessor(unittest.TestCase):
     session_id = 'e39216f13f168815497264e2e2b3c72d'
 
     def test__contains(self):
-        db = sqlite3.connect(':memory:')
-        db.create_function('CONTAINS', 2, self.pr._contains)
-        c = db.cursor()
-        c.execute('''CREATE TABLE test (c1 text)''')
-        c.execute('''INSERT INTO test
-                     VALUES ('str1,str2')''')
-        c.execute('''INSERT INTO test
-                     VALUES ('')''')
+        u_c = self.pr.u_c
 
-        c.execute('''SELECT * FROM test
-                     WHERE CONTAINS(c1, 'r2')''')
-        self.assertIsNone(c.fetchone())
+        u_c.execute('''INSERT INTO users
+                       VALUES (?, '', 'str1,str2', '', '', '')''', (self.nick,))
 
-        c.execute('''SELECT * FROM test
-                     WHERE CONTAINS(c1, 'str1')''')
-        self.assertIsNotNone(c.fetchone())
+        u_c.execute('''SELECT * FROM users
+                       WHERE CONTAINS(friends, 'r2')''')
+        self.assertIsNone(u_c.fetchone())
 
-        db.commit()
-        db.close()
+        u_c.execute('''SELECT * FROM users
+                       WHERE CONTAINS(friends, 'str1')''')
+        self.assertIsNotNone(u_c.fetchone())
+
+        u_c.execute('''DELETE FROM users
+                       WHERE name = ?''', (self.nick,))
+
+        self.pr.u_db.commit()
 
     def test__add_session(self):
         _add_session = self.pr._add_session
@@ -124,15 +129,15 @@ class TestProcessor(unittest.TestCase):
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', '', '', 'user1,user2', '')''', (self.nick,))
 
-        self.assertTrue(_is_blacklisted(self.nick, 'user1'))
+        self.assertTrue(_is_blacklisted('user1', self.nick))
 
-        self.assertFalse(_is_blacklisted(self.nick, 'user3'))
+        self.assertFalse(_is_blacklisted('user3', self.nick))
 
         self.assertFalse(_is_blacklisted(self.nick, self.nick))
 
         u_c.execute('''DELETE FROM users
                        WHERE name = ?''', (self.nick,))
-        self.assertFalse(_is_blacklisted(self.nick, 'user1'))
+        self.assertFalse(_is_blacklisted('user1', self.nick))
 
         self.pr.u_db.commit()
 
@@ -141,12 +146,12 @@ class TestProcessor(unittest.TestCase):
         _remove_add_request = self.pr._remove_add_request
 
         r_c.execute('''INSERT INTO requests
-                       VALUES (?, 'user', 'test request')''')
+                       VALUES (?, 'user', 'test request')''', (self.nick,))
 
         _remove_add_request(self.nick, 'user')
         _remove_add_request(self.nick, 'user')
 
-        r_c.execute('''SELECT FROM requests
+        r_c.execute('''SELECT * FROM requests
                        WHERE from_who = ? AND to_who = 'user' ''', (self.nick,))
         self.assertIsNone(r_c.fetchone())
         self.pr.r_db.commit()
@@ -214,12 +219,12 @@ class TestProcessor(unittest.TestCase):
         usrs = [(self.nick, user1) * 2,
                 (self.nick, '~' + user1) * 2,
                 (user1, user2) * 2]
-        for i in range(2):
+        for i in range(3):
             m_c.execute('''CREATE TABLE "d{}" (content text,
                                                timestamp int,
                                                sender text)'''.format(i))
             m_c.executemany('''INSERT INTO "d{}"
-                               VALUES (?, ?, ?)'''.format(i), (zip(msgs, times, usrs[i])))
+                               VALUES (?, ?, ?)'''.format(i), zip(msgs, times, usrs[i]))
 
         _delete_dialog(0, self.nick)
         m_c.execute('''SELECT sender FROM "d0"''')
@@ -239,7 +244,7 @@ class TestProcessor(unittest.TestCase):
         self.assertIn(user1, senders)
 
         u_c.execute('''SELECT dialogs FROM users
-                       WHERE name = ?''' (self.nick,))
+                       WHERE name = ?''', (self.nick,))
         self.assertEqual(u_c.fetchone()['dialogs'], '')
 
         u_c.execute('''DELETE FROM users
@@ -310,7 +315,7 @@ class TestProcessor(unittest.TestCase):
         self.assertTupleEqual(resp1, exp1)
 
         u_c.execute('''SELECT * FROM users
-                       WHERE name = ? AND pswd = ?''', (self.nick, self.pswd_hash))
+                       WHERE name = ? AND password = ?''', (self.nick, self.pswd))
         self.assertTupleEqual(tuple(u_c.fetchone()), (self.nick, self.pswd, '', '', '', ''))
 
         u_c.execute('''SELECT * FROM profiles
@@ -358,7 +363,7 @@ class TestProcessor(unittest.TestCase):
                                   self.ip,
                                   self.nick,
                                   self.pswd))
-        exp2 = (sc.login_error,
+        exp2 = (sc.login_error.value,
                 [self.request_id])
         self.assertEqual(resp2, exp2)
 
@@ -382,14 +387,19 @@ class TestProcessor(unittest.TestCase):
 
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', '', '', '', '')''', (self.nick,))
-        self.pr._add_session(self.nick, ip)
+        self.pr._add_session(self.nick, self.ip)
         users = ('user1', 'user10', 'user2')
         for i in users:
             u_c.execute('''INSERT INTO users
                            VALUES (?, '', '', '', '', '')''', (i,))
 
-        resp1 = self.unpack(search_username(self.request_id, self.ip, self.session_id, 'user1'))
-        exp1 = (sc.search_username_result.value, [self.request_id, ['user1', 'user10']])
+        resp1 = self.unpack(search_username(self.request_id,
+                                            self.ip,
+                                            self.session_id,
+                                            'user1'))
+        exp1 = (sc.search_username_result.value,
+                [self.request_id,
+                 ['user1', 'user10']])
         self.assertEqual(resp1[0], exp1[0])
         self.assertEqual(resp1[1][0], exp1[1][0])
         self.assertListEqual(sorted(resp1[1][1]), exp1[1][1])
@@ -400,10 +410,10 @@ class TestProcessor(unittest.TestCase):
                                             'user'))
         exp2 = (sc.search_username_result.value,
                 [self.request_id,
-                                                  ['user1', 'user10', 'user2']])
+                 [self.nick, 'user1', 'user10', 'user2']])
         self.assertEqual(resp2[0], exp2[0])
         self.assertEqual(resp1[1][0], exp1[1][0])
-        self.assertListEqual(sorted(resp2[1][0]), exp2[1][0])
+        self.assertListEqual(sorted(resp2[1][1]), exp2[1][1])
 
         u_c.execute('''DELETE FROM users
                        WHERE name = ?''', (self.nick,))
@@ -415,7 +425,7 @@ class TestProcessor(unittest.TestCase):
         self.pr.u_db.commit()
 
     def test_friends_group(self):
-        friends_group = self.pr.friends.group
+        friends_group = self.pr.friends_group
         _add_session = self.pr._add_session
         _close_session = self.pr._close_session
         u_c = self.pr.u_c
@@ -423,7 +433,7 @@ class TestProcessor(unittest.TestCase):
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', 'user1,user10,user2',
                                'user2', 'user3', '')''', (self.nick,))
-        _add_session(self.nick, ip)
+        _add_session(self.nick, self.ip)
         users = ('user1', 'user10', 'user2', 'users3')
         for i in users:
             u_c.execute('''INSERT INTO users
@@ -441,7 +451,7 @@ class TestProcessor(unittest.TestCase):
                  ['user2'],
                  ['user3']]])
         self.assertEqual(resp[0], exp[0])
-        self.assertEqual(resp1[1][0], exp1[1][0])
+        self.assertEqual(resp[1][0], exp[1][0])
         for i in range(len(resp[1][0])):
             self.assertListEqual(sorted(resp[1][1][i]), exp[1][1][i])
 
@@ -463,7 +473,7 @@ class TestProcessor(unittest.TestCase):
 
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', '', '', '', '0')''', (self.nick,))
-        self.pr._add_session(self.nick, ip)
+        self.pr._add_session(self.nick, self.ip)
         m_c.execute('''CREATE TABLE "d0" (content text,
                                           timestamp int,
                                           sender text)''')
@@ -472,7 +482,7 @@ class TestProcessor(unittest.TestCase):
         for i in range(5):
             m_c.execute('''INSERT INTO "d0"
                            VALUES (?, ?, ?)''', (str(i), 50 * i, self.nick))
-            msgs.append((str(i), i * 50, self.nick))
+            msgs.append([str(i), i * 50, self.nick])
 
         with self.assertRaises(BadRequest):
             message_history(self.request_id,
@@ -514,8 +524,8 @@ class TestProcessor(unittest.TestCase):
         other_user = '@other_user'
 
         u_c.execute('''INSERT INTO users
-                       VALUES (?, '', '', '', '', '')''', (self.nick,))
-        self.pr._add_session(self.nick, ip)
+                       VALUES (?, '', '', '', '', '0')''', (self.nick,))
+        self.pr._add_session(self.nick, self.ip)
         m_c.execute('''CREATE TABLE "d0" (content text,
                                           timestamp int,
                                           sender text)''')
@@ -524,7 +534,7 @@ class TestProcessor(unittest.TestCase):
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', '', '', ?, '')''', (other_user, self.nick))
 
-        msg_args = ('test', int(time.time() * 100), self.nick)
+        msg_args = ['test', int(time.time() * 100), 0]
         resp1 = self.unpack(send_message(self.request_id,
                                          self.ip,
                                          self.session_id,
@@ -532,6 +542,8 @@ class TestProcessor(unittest.TestCase):
         exp1 = (sc.message_received.value,
                 [self.request_id])
         self.assertTupleEqual(resp1, exp1)
+
+        msg_args = msg_args[:2] + [self.nick]
         m_c.execute('''SELECT * FROM "d0"
                        WHERE content = ? AND timestamp = ?
                        AND sender = ?''', msg_args)
@@ -572,7 +584,7 @@ class TestProcessor(unittest.TestCase):
                        VALUES (?, '', '', '', '', '')''', (self.nick,))
         u_c.execute('''INSERT INTO profiles
                        VALUES (?, '', '', 0, '', x'')''', (self.nick,))
-        self.pr._add_session(self.nick, ip)
+        self.pr._add_session(self.nick, self.ip)
 
         resp = self.unpack(change_profile_section(self.request_id,
                                                   self.ip,
@@ -583,7 +595,7 @@ class TestProcessor(unittest.TestCase):
                [self.request_id])
         self.assertTupleEqual(resp, exp)
 
-        u_c.execute('''SELECT * FROM users
+        u_c.execute('''SELECT * FROM profiles
                        WHERE name = ?''', (self.nick,))
         self.assertEqual(change, u_c.fetchone()['status'])
 
@@ -618,7 +630,7 @@ class TestProcessor(unittest.TestCase):
 
         u_c.execute('''INSERT INTO users
                        VALUES (?1, '', ?2, ?2, '', '')''', (self.nick, user1))
-        self.pr._add_session(self.nick, ip)
+        self.pr._add_session(self.nick, self.ip)
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', '', '', '', '')''', (user1,))
         u_c.execute('''INSERT INTO users
@@ -634,6 +646,11 @@ class TestProcessor(unittest.TestCase):
                [self.request_id])
         self.assertTupleEqual(resp, exp)
 
+        add_to_blacklist(self.request_id,
+                         self.ip,
+                         self.session_id,
+                         user2)
+
         with self.assertRaises(BadRequest):
             add_to_blacklist(self.request_id,
                              self.ip,
@@ -645,10 +662,10 @@ class TestProcessor(unittest.TestCase):
         row = u_c.fetchone()
         self.assertEqual(row['friends'], '')
         self.assertEqual(row['favorites'], '')
-        self.assertEqual(row['blacklist'], user1)
+        self.assertEqual(row['blacklist'], user1 + ',' + user2)
 
         r_c.execute('''SELECT * FROM requests
-                       WHERE from_who = ? AND to_who = ?''', (self.nick,))
+                       WHERE from_who = ? AND to_who = ?''', (self.nick, user2))
         self.assertIsNone(r_c.fetchone())
 
         u_c.execute('''DELETE FROM users
@@ -660,22 +677,23 @@ class TestProcessor(unittest.TestCase):
         self.pr.r_db.commit()
 
     def test_delete_from_friends(self):
+        delete_from_friends = self.pr.delete_from_friends
         u_c = self.pr.u_c
         user1 = '@other_user'
 
         u_c.execute('''INSERT INTO users
                        VALUES (?1, '', ?2, ?2, '', '')''', (self.nick, user1))
-        self.pr._add_session(self.nick, ip)
+        self.pr._add_session(self.nick, self.ip)
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', '', '', '', '')''', (user1,))
 
-        resp = self.pr.delete_from_friends(self.request_id,
+        resp = self.unpack(delete_from_friends(self.request_id,
                                            self.ip,
                                            self.session_id,
-                                           user1)
+                                           user1))
         exp = (sc.delete_from_friends_succ.value,
                [self.request_id])
-        self.assertTupleEqual(resp,exp)
+        self.assertTupleEqual(resp, exp)
 
         u_c.execute('''SELECT friends, favorites FROM users
                        WHERE name = ?''', (self.nick,))
@@ -699,7 +717,7 @@ class TestProcessor(unittest.TestCase):
 
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', '', '', '', '')''', (self.nick,))
-        self.pr._add_session(self.nick, ip)
+        self.pr._add_session(self.nick, self.ip)
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', '', '', '', '')''', (user1,))
 
@@ -766,7 +784,7 @@ class TestProcessor(unittest.TestCase):
 
         u_c.execute('''INSERT INTO users
                        VALUES (?1, '', ?2, ?2, '', '0')''', (self.nick, user1))
-        self.pr._add_session(self.nick, ip)
+        self.pr._add_session(self.nick, self.ip)
         u_c.execute('''INSERT INTO profiles
                        VALUES (?, '', '', 0, '', x'')''', (self.nick,))
         u_c.execute('''INSERT INTO users
@@ -786,20 +804,20 @@ class TestProcessor(unittest.TestCase):
         resp = self.unpack(delete_profile(self.request_id,
                                           self.ip,
                                           self.session_id))
-        exp = (sc.delete_profile_succ,
+        exp = (sc.delete_profile_succ.value,
                [self.request_id])
         self.assertTupleEqual(resp, exp)
 
         u_c.execute('''SELECT * FROM users
-                       WHERE nick = ?''', (self.nick,))
+                       WHERE name = ?''', (self.nick,))
         self.assertIsNone(u_c.fetchone())
 
         u_c.execute('''SELECT * FROM profiles
-                       WHERE nick = ?''', (self.nick,))
+                       WHERE name = ?''', (self.nick,))
         self.assertIsNone(u_c.fetchone())
 
         u_c.execute('''SELECT friends, favorites FROM users
-                       WHERE nick = ?''', (user1,))
+                       WHERE name = ?''', (user1,))
         for i in u_c.fetchone():
             self.assertEqual(i, '')
 
@@ -812,7 +830,7 @@ class TestProcessor(unittest.TestCase):
         self.assertIsNone(m_c.fetchone())
 
         r_c.execute('''SELECT * FROM requests
-                       WHERE from_who = ?1 OR to_who = ?1''', (self.nick))
+                       WHERE from_who = ?1 OR to_who = ?1''', (self.nick,))
         self.assertListEqual(r_c.fetchall(), [])
 
         s_c.execute('''SELECT name FROM sessions
@@ -823,7 +841,7 @@ class TestProcessor(unittest.TestCase):
         u_c.execute('''DELETE FROM users
                        WHERE name = ?''', (user1,))
         u_c.execute('''DELETE FROM users
-                           WHERE name = ?''', (user2,))
+                       WHERE name = ?''', (user2,))
 
         self.pr.u_db.commit()
         self.pr.m_db.commit()
@@ -834,16 +852,16 @@ class TestProcessor(unittest.TestCase):
         logout = self.pr.logout
         s_c = self.pr.s_c
 
-        self.pr._add_session(self.nick, ip)
+        self.pr._add_session(self.nick, self.ip)
 
         resp = self.unpack(logout(self.request_id,
                                   self.ip,
                                   self.session_id))
-        exp = (sc.logout_succ,
+        exp = (sc.logout_succ.value,
                [self.request_id])
         self.assertTupleEqual(resp, exp)
 
-        s_c.execute('''SELECT FROM sessions
+        s_c.execute('''SELECT * FROM sessions
                        WHERE session_id = ?''', (self.session_id,))
         self.assertIsNone(s_c.fetchone())
 
@@ -859,7 +877,7 @@ class TestProcessor(unittest.TestCase):
 
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', ?, '', '', '0')''', (self.nick, user1 + ',' + user2))
-        self.pr._add_session(self.nick, ip)
+        self.pr._add_session(self.nick, self.ip)
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', ?, '', '', '')''', (user1, self.nick))
         u_c.execute('''INSERT INTO users
@@ -874,7 +892,7 @@ class TestProcessor(unittest.TestCase):
                                          self.ip,
                                          self.session_id,
                                          user1))
-        exp = (sc.create_dialog_succ,
+        exp = (sc.create_dialog_succ.value,
                [self.request_id])
         self.assertTupleEqual(resp, exp)
 
@@ -930,9 +948,9 @@ class TestProcessor(unittest.TestCase):
 
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', '', '', '', '')''', (self.nick,))
-        self.pr._add_session(self.nick, ip)
+        self.pr._add_session(self.nick, self.ip)
         u_c.execute('''INSERT INTO profiles
-                       VALUES (?, ?, ?, 0, '', x'PNG')''', (self.nick, status, email))
+                       VALUES (?, ?, ?, 0, '', x'')''', (self.nick, status, email))
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', '', '', ?, '')''', (user1, self.nick))
 
@@ -940,13 +958,13 @@ class TestProcessor(unittest.TestCase):
                                         self.ip,
                                         self.session_id,
                                         self.nick))
-        exp = (sc.profile_info,
+        exp = (sc.profile_info.value,
                [self.request_id,
                 status,
                 email,
                 0,
                 '',
-                b'PNG'])
+                b''])
         self.assertEqual(resp, exp)
 
         with self.assertRaises(BadRequest):
@@ -972,7 +990,7 @@ class TestProcessor(unittest.TestCase):
 
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', '', '', ?, '')''', (self.nick, user1))
-        self.pr._add_session(self.nick, ip)
+        self.pr._add_session(self.nick, self.ip)
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', '', '', '', '')''', (user1,))
 
@@ -980,7 +998,7 @@ class TestProcessor(unittest.TestCase):
                                                  self.ip,
                                                  self.session_id,
                                                  user1))
-        exp = (sc.remove_from_blacklist_succ,
+        exp = (sc.remove_from_blacklist_succ.value,
                [self.request_id])
         self.assertTupleEqual(resp, exp)
 
@@ -1002,7 +1020,7 @@ class TestProcessor(unittest.TestCase):
 
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', '', '', '', '')''', (self.nick,))
-        self.pr._add_session(self.nick, ip)
+        self.pr._add_session(self.nick, self.ip)
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', '', '', '', '')''', (user1,))
         r_c.execute('''INSERT INTO requests
@@ -1012,7 +1030,7 @@ class TestProcessor(unittest.TestCase):
                                              self.ip,
                                              self.session_id,
                                              user1))
-        exp = (sc.take_request_back_succ,
+        exp = (sc.take_request_back_succ.value,
                [self.request_id])
         self.assertTupleEqual(resp, exp)
 
@@ -1036,7 +1054,7 @@ class TestProcessor(unittest.TestCase):
 
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', '', '', ?, '')''', (self.nick, user2))
-        self.pr._add_session(self.nick, ip)
+        self.pr._add_session(self.nick, self.ip)
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', '', '', '', '')''', (user1,))
         u_c.execute('''INSERT INTO users
@@ -1050,7 +1068,7 @@ class TestProcessor(unittest.TestCase):
                                                self.ip,
                                                self.session_id,
                                                user1))
-        exp = (sc.confirm_add_request_succ,
+        exp = (sc.confirm_add_request_succ.value,
                [self.request_id])
         self.assertTupleEqual(resp, exp)
 
@@ -1080,7 +1098,7 @@ class TestProcessor(unittest.TestCase):
                        WHERE name = ?''', (user1,))
         u_c.execute('''DELETE FROM users
                        WHERE name = ?''', (user2,))
-        r_c.execute('''DELETE FROM users
+        r_c.execute('''DELETE FROM requests
                        WHERE from_who = ?''', (user2,))
         self.pr._close_session(self.session_id)
 
@@ -1094,7 +1112,7 @@ class TestProcessor(unittest.TestCase):
 
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', ?, '', '', '')''', (self.nick, user1))
-        self.pr._add_session(self.nick, ip)
+        self.pr._add_session(self.nick, self.ip)
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', ?, '', '', '')''', (user1, self.nick))
 
@@ -1102,7 +1120,7 @@ class TestProcessor(unittest.TestCase):
                                             self.ip,
                                             self.session_id,
                                             user1))
-        exp = (sc.add_to_favorites_succ,
+        exp = (sc.add_to_favorites_succ.value,
                [self.request_id])
         self.assertTupleEqual(resp, exp)
 
@@ -1113,7 +1131,7 @@ class TestProcessor(unittest.TestCase):
         u_c.execute('''DELETE FROM users
                        WHERE name = ?''', (self.nick,))
         u_c.execute('''DELETE FROM users
-                       WHERE name = ?''', (self.nick,))
+                       WHERE name = ?''', (user1,))
         self.pr._close_session(self.session_id)
 
         self.pr.u_db.commit()
@@ -1124,8 +1142,8 @@ class TestProcessor(unittest.TestCase):
         m_c = self.pr.m_c
 
         u_c.execute('''INSERT INTO users
-                       VALUES (?, '', '', '', '', '')''', (self.nick,))
-        self.pr._add_session(self.nick, ip)
+                       VALUES (?, '', '', '', '', '0')''', (self.nick,))
+        self.pr._add_session(self.nick, self.ip)
         m_c.execute('''CREATE TABLE "d0" (content text,
                                           timestamp int,
                                           sender text)''')
@@ -1136,7 +1154,7 @@ class TestProcessor(unittest.TestCase):
                                          self.ip,
                                          self.session_id,
                                          0))
-        exp = (sc.delete_dialog_succ,
+        exp = (sc.delete_dialog_succ.value,
                [self.request_id])
         self.assertTupleEqual(resp, exp)
 
@@ -1161,16 +1179,16 @@ class TestProcessor(unittest.TestCase):
         search_msg = self.pr.search_msg
         u_c = self.pr.u_c
         m_c = self.pr.m_c
-        messages = [('test_message', 50, self.nick),
-                    ('different', 60, self.nick),
-                    ('look here', 70, self.nick),
-                    ('more text', 80, self.nick),
-                    ('look above', 90, self.nick),
-                    ('nothing to see', 100, self.nick)]
+        messages = [['test_message', 50, self.nick],
+                    ['different', 60, self.nick],
+                    ['look here', 70, self.nick],
+                    ['more text', 80, self.nick],
+                    ['look above', 90, self.nick],
+                    ['nothing to see', 100, self.nick]]
 
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', '', '', '', '0')''', (self.nick,))
-        self.pr._add_session(self.nick, ip)
+        self.pr._add_session(self.nick, self.ip)
         m_c.execute('''CREATE TABLE "d0" (content text,
                                           timestamp int,
                                           sender text)''')
@@ -1184,7 +1202,7 @@ class TestProcessor(unittest.TestCase):
                                        'test_mess',
                                        50,
                                        100))
-        exp1 = (sc.search_msg_result,
+        exp1 = (sc.search_msg_result.value,
                 [self.request_id,
                  [messages[0]]])
         self.assertTupleEqual(resp1, exp1)
@@ -1196,7 +1214,7 @@ class TestProcessor(unittest.TestCase):
                                        'look',
                                        50,
                                        80))
-        exp1 = (sc.search_msg_result,
+        exp2 = (sc.search_msg_result.value,
                 [self.request_id,
                  [messages[2]]])
         self.assertTupleEqual(resp2, exp2)
@@ -1208,7 +1226,7 @@ class TestProcessor(unittest.TestCase):
                                        'look nowhere',
                                        0,
                                        100))
-        exp1 = (sc.search_msg_result,
+        exp3 = (sc.search_msg_result.value,
                 [self.request_id,
                  []])
         self.assertTupleEqual(resp3, exp3)
@@ -1237,15 +1255,15 @@ class TestProcessor(unittest.TestCase):
 
         u_c.execute('''INSERT INTO users
                        VALUES (?1, '', ?2, ?2, '', '')''', (self.nick, user1))
-        self.pr._add_session(self.nick, ip)
+        self.pr._add_session(self.nick, self.ip)
         u_c.execute('''INSERT INTO users
-                       VALUES (?, '', ?, '', '', '')''', (user1,))
+                       VALUES (?, '', ?, '', '', '')''', (user1, self.nick))
 
         resp = self.unpack(remove_from_favorites(self.request_id,
                                                  self.ip,
                                                  self.session_id,
                                                  user1))
-        exp = (sc.remove_from_favorites_succ,
+        exp = (sc.remove_from_favorites_succ.value,
                [self.request_id])
         self.assertTupleEqual(resp, exp)
 
@@ -1270,7 +1288,7 @@ class TestProcessor(unittest.TestCase):
 
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', '', '', '', '')''', (self.nick,))
-        self.pr._add_session(self.nick, ip)
+        self.pr._add_session(self.nick, self.ip)
         r_c.execute('''INSERT INTO requests
                        VALUES (?, ?, 'hello')''', (user1, self.nick))
         r_c.execute('''INSERT INTO requests
@@ -1279,9 +1297,9 @@ class TestProcessor(unittest.TestCase):
         resp = self.unpack(add_requests(self.request_id,
                                         self.ip,
                                         self.session_id))
-        exp = (sc.add_requests,
+        exp = (sc.add_requests.value,
                [self.request_id,
-                [(user1, self.nick, 'hello')]])
+                [[user1, 'hello']]])
         self.assertTupleEqual(resp, exp)
 
         u_c.execute('''DELETE FROM users
@@ -1301,7 +1319,7 @@ class TestProcessor(unittest.TestCase):
 
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', '', '', '', '')''', (self.nick,))
-        self.pr._add_session(self.nick, ip)
+        self.pr._add_session(self.nick, self.ip)
         u_c.execute('''INSERT INTO users
                        VALUES (?, '', '', '', '', '')''', (user1,))
         r_c.execute('''INSERT INTO requests
@@ -1311,7 +1329,7 @@ class TestProcessor(unittest.TestCase):
                                                self.ip,
                                                self.session_id,
                                                user1))
-        exp = (sc.decline_add_request_succ,
+        exp = (sc.decline_add_request_succ.value,
                [self.request_id])
         self.assertTupleEqual(resp, exp)
 
@@ -1337,13 +1355,13 @@ class TestProcessor(unittest.TestCase):
                        VALUES (?, '', '', '', '', '')''', (self.nick,))
         u_c.execute('''INSERT INTO profiles
                        VALUES (?, '', '', 0, '', x'')''', (self.nick,))
-        self.pr._add_session(self.nick, ip)
+        self.pr._add_session(self.nick, self.ip)
 
         resp = self.unpack(set_image(self.request_id,
                                      self.ip,
                                      self.session_id,
                                      img))
-        exp = (sc.set_image_succ,
+        exp = (sc.set_image_succ.value,
                [self.request_id])
         self.assertTupleEqual(resp, exp)
 

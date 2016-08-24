@@ -84,7 +84,7 @@ sc = ServerCodes
 # Add notificators about events
 
 class Processor:
-    def _contains(self, cont, st):
+    def _contains(cont, st):
         """Показывает, является ли строка st одним из элементов
         строки cont, разделенных запятыми
         Для использования в качестве SQL-функции"""
@@ -111,6 +111,7 @@ class Processor:
 
     # Регулярное выражение для валидации имен пользователей
     nick_ptrn = re.compile('(?![ ]+)[\w ]{2,15}')
+
 
     def _add_session(self, nick, ip):
         """Добавляет пользователя nick по IP-адресу ip в таблицу сессий
@@ -177,7 +178,7 @@ class Processor:
         """Проверяет, находится ли nick в черном списке user"""
         if nick == user:
             return False
-        self.u_c.execute('''SELECT blacklist FROM users
+        self.u_c.execute('''SELECT name FROM users
                             WHERE name = ? AND CONTAINS(blacklist, ?)''', (user, nick))
         return bool(self.u_c.fetchone())
 
@@ -229,7 +230,7 @@ class Processor:
         else:
             self.m_c.execute('''UPDATE d{} SET sender = '~' || ?1
                                 WHERE sender = ?1'''.format(dialog), (user,))
-        self._remove_from(user, dialog, 'dialogs')  # Диалог с номером dialog удаляется из диалогов пользователя user
+        self._remove_from(user, str(dialog), 'dialogs')  # Диалог с номером dialog удаляется из диалогов пользователя user
         self.m_db.commit()
 
     def _user_exists(self, user):
@@ -242,7 +243,7 @@ class Processor:
 
     def _valid_nick(self, nick):
         """Проверяет, является ли nick допустимым именем пользователя"""
-        return bool(re.fullmatch(nick_ptrn, nick))
+        return bool(re.fullmatch(self.nick_ptrn, nick))
 
     def _next_free_dialog(self):
         """Возвращает следующий свободный номер диалога"""
@@ -251,7 +252,7 @@ class Processor:
         for i in range(1, len(dialogs)):
             if dialogs[i] - dialogs[i - 1] != 1:
                 return dialogs[i - 1] + 1
-        return dialogs[i] + 1
+        return dialogs[-1] + 1
 
 
     def register(self, request_id, ip, nick, pswd):
@@ -333,7 +334,7 @@ class Processor:
         self.m_c.execute('''SELECT * FROM d{}
                             ORDER BY timestamp'''.format(dialog))
         msgs = [tuple(i) for i in self.m_c.fetchall()]
-        return self._pack(sc.message_history, msgs[-count:])
+        return self._pack(sc.message_history, request_id, msgs[-count:])
 
     def send_message(self, request_id, ip, session_id, msg, tm, dialog):
         """Отправить сообщение msg с временем tm в диалог под номером dialog
@@ -379,7 +380,7 @@ class Processor:
             raise BadRequest
 
         with self.u_db:
-            self.u_c.execute('''UPDATE users SET {} = ?
+            self.u_c.execute('''UPDATE profiles SET {} = ?
                                 WHERE name = ?'''.format(sect_name), (change, nick))
         return self._pack(sc.change_profile_section_succ, request_id)
 
@@ -521,7 +522,7 @@ class Processor:
                             WHERE name = ?''', (user,))
 
         *info, img_data = tuple(self.u_c.fetchone())
-        return self._pack(sc.profile_info, *info) + b',' + img_data
+        return self._pack(sc.profile_info, request_id, *info) + b',' + img_data
 
     def remove_from_blacklist(self, request_id, ip, session_id, user):
         """Удалить пользователя user из черного списка отправителя"""
@@ -610,7 +611,7 @@ class Processor:
         self.r_c.execute('''SELECT from_who, message FROM requests
                             WHERE to_who = ?''', (nick,))
         result = map(tuple, self.r_c.fetchall())
-        return self._pack(sc.add_requests, list(result))
+        return self._pack(sc.add_requests, request_id, list(result))
 
     def decline_add_request(self, request_id, ip, session_id, user):
         """Отменить запрос на добавление от пользователя user к отправителю"""
