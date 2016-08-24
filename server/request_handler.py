@@ -51,7 +51,7 @@ class RequestHandler:
         """Распаковывает ответ response"""
         if response[:2] == self.profile_info_code:
             comma_idx = 0
-            for i in range(5):
+            for i in range(6):
                 comma_idx += response[comma_idx:].find(b',') + 1
             body, img = response[:comma_idx - 1], response[comma_idx:]
             code, *data = json.loads('[' + body.decode() + ']')
