@@ -1,0 +1,12 @@
+language: python
+
+python:
+  - "3.4"
+
+script:
+  - cd server
+  - python3 test_processors.py
+  - python3 test_request_handler.py
+
+notifications:
+  email: false
