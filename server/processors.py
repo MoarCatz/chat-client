@@ -1,5 +1,5 @@
 import sqlite3, json, re
-from hashlib import md5
+from hashlib import sha256
 from enum import IntEnum
 
 sample_img = (b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR'
@@ -124,8 +124,8 @@ class Processor:
     def _add_session(self, nick, ip):
         """Добавляет пользователя nick по IP-адресу ip в таблицу сессий
         Вызывает BadRequest, если такая комбинация данных уже есть в таблице"""
-        md = md5((ip + nick).encode())
-        session_id = md.hexdigest()
+        sha = sha256((ip + nick).encode())
+        session_id = sha.hexdigest()
         try:
             with self.s_db:
                 self.s_c.execute('''INSERT INTO sessions

@@ -6,7 +6,7 @@ for i in os.listdir('data'):
 import unittest, time
 from processors import *
 from request_handler import RequestHandler
-from hashlib import md5
+from hashlib import sha256
 from installer import Installer
 
 Installer.install()
@@ -21,7 +21,7 @@ class TestProcessor(unittest.TestCase):
     ip = 'test_ip'
     pswd = '009b9edb38b800110ae4b25e1b0f9953'
     request_id = '0'
-    session_id = 'e39216f13f168815497264e2e2b3c72d'
+    session_id = sha256((nick + ip).encode()).hexdigest()
 
     def test__contains(self):
         u_c = self.pr.u_c
