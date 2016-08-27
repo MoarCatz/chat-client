@@ -106,6 +106,7 @@ class Processor:
 
     m_db = sqlite3.connect('data/messages.db')
     m_db.row_factory = sqlite3.Row
+    m_db.create_function('INGOING', 2, _ingoing)
     m_c = m_db.cursor()
 
     r_db = sqlite3.connect('data/requests.db')
@@ -301,7 +302,7 @@ class Processor:
         # 2,"a2e6190b636ed13c2ccaea3f7e48fe09","127.0.0.1","446f70d040ebb98c10d380a0ffaf83df","user1"
         self._check_session(session_id, ip)
         self.u_c.execute('''SELECT name FROM users
-                            WHERE INSTR(name, ?)''', (user,))
+                            WHERE INGOING(name, ?)''', (user,))
         search_results = [row['name'] for row in self.u_c.fetchall()]
         return self._pack(sc.search_username_result, request_id, search_results)
 
@@ -597,7 +598,7 @@ class Processor:
         nick = self._check_session(session_id, ip)
         self._user_in_dialog(nick, dialog)
         self.m_c.execute('''SELECT * FROM d{}
-                            WHERE INSTR(content, ?) AND
+                            WHERE INGOING(content, ?) AND
                             timestamp BETWEEN ? AND ?'''.format(dialog), (text, lower_tm, upper_tm))
         result = map(tuple, self.m_c.fetchall())
         return self._pack(sc.search_msg_result, request_id, list(result))
