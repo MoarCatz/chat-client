@@ -100,6 +100,7 @@ class Processor:
 
     u_db.row_factory = sqlite3.Row
     u_db.create_function('CONTAINS', 2, _contains)
+    u_db.create_function('INGOING', 2, _ingoing)
     u_c = u_db.cursor()
 
     u_c.execute('''PRAGMA foreign_keys = 1''')
