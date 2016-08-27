@@ -91,7 +91,7 @@ class Processor:
         return int(st in cont.split(','))
 
     def _ingoing(st, substr):
-        """Возвращает индекс первого вхождения substr
+        """Проверяет, входит ли подстрока substr
         в основную строку st
         Для использования в качестве SQL-функции"""
         return int(substr in st)
