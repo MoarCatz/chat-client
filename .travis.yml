@@ -5,6 +5,7 @@ python:
 
 script:
   - cd server
+  - python3 -c "print(__import__('sqlite3').sqlite_version)"
   - python3 test_processors.py
   - python3 test_request_handler.py
 
