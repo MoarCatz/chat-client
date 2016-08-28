@@ -8,6 +8,7 @@ Config.set('graphics', 'resizable', False)
 
 import string, re
 from datetime import datetime
+from PIL import Image as _Image
 
 from kivy.app import App
 from kivy.lang import Builder
@@ -32,11 +33,12 @@ from kivy.uix.settings import Settings
 from kivy.uix.togglebutton import ToggleButton
 from kivy.uix.spinner import Spinner
 from kivy.clock import Clock
+from kivy.uix.image import Image
 
 
 Builder.load_string('''
 <Label>:
-    font_name: "fonts/ionicons_regular.ttf"
+    font_name: "fonts/OpenSans-Regular.ttf"
     halign: "center"
     color: 0, 0, 0, 1
 
@@ -253,7 +255,7 @@ Builder.load_string('''
 <NickInput>:
     multiline: False
     font_size: 14
-    font_name: "fonts/ionicons_regular.ttf"
+    font_name: "fonts/OpenSans-Regular.ttf"
     cursor_color: 0, 0, 0, 1
     write_tab: False
     background_normal: "textures/textinput/nickinput_unfocused.png"
@@ -672,7 +674,7 @@ class DatePicker(BoxLayout):
 
         self.month = DateSpinner(size_hint = (0.5, 1),
                                  values = ('January', 'February', 'March', 'April',
-                                           'June', 'July', 'August', 'September',
+                                           'May', 'June', 'July', 'August', 'September',
                                            'October', 'November', 'December'))
 
         self.year = DateSpinner(size_hint = (0.3, 1),
@@ -720,7 +722,7 @@ class RegScreen(Screen):
         self.lb_reg = RegLabel(text = "Register")
 
         self.to_login = InputButton(size_hint = (0.3, 1),
-                                    font_name = "fonts/ionicons_semibold.ttf",
+                                    font_name = "fonts/ionicons_regular.ttf",
                                     text = " Login",
                                     on_release = app.to_login,
                                     background_normal = 'textures/button/topbt_normal.png')
@@ -836,6 +838,13 @@ class MenuScreen(Screen):
 
         self.add_bar = BoxLayout()
         self.users_disp = GridLayout()
+
+        self.logged_as_lb = Label(text = "Logged in as " + app.name,
+                                  pos_hint = {"top": 0.8, "right": 0.1},
+                                  font_size = 16)
+        self.avatar = Image(source = 'temp/self_avatar.png',
+                            size_hint = (0.2, 0.2),
+                            pos_hint = {"top": 0.1, "right": 0.2})
 
 
 class UserRecord(BoxLayout):
@@ -1088,6 +1097,7 @@ class ChatApp(App):
             ErrorDisp(self.nick_taken).open()
         else:
             'register'
+            _Image.new('RGB', (1, 1)).save('temp/self_avatar.png', 'PNG')
             self.to_menu()
 
     def login(self, bt):
@@ -1095,6 +1105,7 @@ class ChatApp(App):
             ErrorDisp(self.wrong_pswd).open()
         else:
             'login'
+            _Image.new('RGB', (1, 1)).save('PNG', 'temp/self_avatar.png')
             self.to_menu()
 
     def width_modify(self, inst):
