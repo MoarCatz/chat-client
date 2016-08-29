@@ -6,7 +6,7 @@ Config.set('graphics', 'width', 370)
 Config.set('graphics', 'height', 240)
 Config.set('graphics', 'resizable', False)
 
-import string, re
+import string, re, os
 from datetime import datetime
 from PIL import Image as _Image
 
@@ -81,6 +81,11 @@ Builder.load_string('''
     background_down: 'textures/button/down.png'
     background_disabled_normal: 'textures/button/disabled.png'
     disabled_color: 1, 1, 1, 1
+
+<ErrorLabel>:
+    text_size: self.size
+    halign: "left"
+    valign: "top"
 
 <HelpBar>:
     MenuButton:
@@ -169,6 +174,10 @@ Builder.load_string('''
     background_down: 'textures/button/inputbt_down.png'
     font_name: 'fonts/ionicons_semibold.ttf'
 
+<LoggedAsLabel>:
+    text_size: self.width - 10, self.height
+    halign: "left"
+
 <LoginLayout>:
     canvas.before:
         Color:
@@ -198,6 +207,28 @@ Builder.load_string('''
     #font_size: 16
     #font_name: 'fonts/ionicons_semibold.ttf'
     #size_hint: 1, 0.1
+
+<MenuButton>:
+    size_hint: 1, 0.09
+    background_normal: 'textures/button/topbt_normal.png'
+    background_down: 'textures/button/inputbt_down.png'
+    font_name: 'fonts/ionicons_regular.ttf'
+    font_size: 17
+    markup: True
+
+<MenuDivider>:
+    canvas:
+        Color:
+            rgba: 0.86, 0.86, 0.86, 1
+        Line:
+            points: self.x, self.y, self.x, self.y + self.height
+            width: 1.5
+        Rectangle:
+            source: 'textures/button/inputbt_normal.png'
+            size: self.size
+            pos: self.pos
+        Line:
+            points: self.x + self.width, self.y, self.x + self.width, self.y + self.height
 
 <Message>:
     width: 500
@@ -408,6 +439,9 @@ Builder.load_string('''
     color: 1, 1, 1, 1
     font_name: 'fonts/ionicons_semibold.ttf'
     size_hint: 0.7, 1
+    text_size: self.width - 20, self.height - 10
+    halign: "left"
+    valign: "center"
     canvas.before:
         Color:
             rgba: 0.86, 0.86, 0.86, 1
@@ -479,11 +513,6 @@ Builder.load_string('''
         Ellipse:
             pos: self.x + 10, self.y + 10
             size: 10, 10
-
-<ErrorLabel>:
-    text_size: self.size
-    halign: "left"
-    valign: "top"
 ''')
 
 
@@ -772,6 +801,7 @@ class RegScreen(Screen):
         self.show_psw = ShowPswdButton(size_hint = (0.4, 0.15),
                                        pos_hint = {"top": 0.16, "right": 0.4},
                                        text = ' Show password',
+                                       font_name = "fonts/ionicons_regular.ttf",
                                        background_color = (0, 0, 0, 0))
 
         self.add_widget(self.top_box)
@@ -819,32 +849,77 @@ class ErrorDisp(Popup):
 
 
 class MenuButton(Button):
+    def __init__(self, **kwargs):
+        if 'text' in kwargs and 'num' in kwargs:
+            text_t = kwargs.pop('text')
+            num = kwargs.pop('num')
+            self.text = ('[size=24]' + text_t[0] + '[/size]' +
+                         ' ' * num[0] + text_t[1] + ' ' * num[1])
+        super().__init__(**kwargs)
+
+
+class MenuDivider(Widget):
+    pass
+
+
+class LoggedAsLabel(Label):
     pass
 
 
 class MenuScreen(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.left_bar = BoxLayout(size_hint = (0.4, 1))
+        self.container = BoxLayout()
+        self.left_bar = BoxLayout(size_hint = (0.4, 1),
+                                  orientation = "vertical")
         self.right_bar = BoxLayout(size_hint = (0.6, 1))
+        self.divider = MenuDivider(size_hint = (0.01, 1))
 
-        self.menu_label = RegLabel(text = "Menu")
-        self.info_box = FloatLayout()
-        self.profile_bt = MenuButton()
-        self.logout_bt = MenuButton()
-        self.settings_bt = MenuButton()
-        self.help_bt = MenuButton()
-        self.quit_bt = MenuButton()
+        self.menu_label = RegLabel(text = "Menu",
+                                   size_hint = (1, 0.08),
+                                   font_size = 17)
+        self.info_box = FloatLayout(size_hint = (1, 0.3))
+        self.profile_bt = MenuButton(text = ('', "Profile"),
+                                     num = (14, 14))
+        self.logout_bt = MenuButton(text = ('', 'Log out'),
+                                    num = (13, 13))
+        self.settings_bt = MenuButton(text = ('', 'Settings'),
+                                      num = (12, 13))
+        self.help_bt = MenuButton(text = ('', 'Help'),
+                                  num = (15, 16))
+        self.quit_bt = MenuButton(text = ('', 'Quit'),
+                                  num = (16, 16))
 
         self.add_bar = BoxLayout()
         self.users_disp = GridLayout()
 
-        self.logged_as_lb = Label(text = "Logged in as " + app.name,
-                                  pos_hint = {"top": 0.8, "right": 0.1},
-                                  font_size = 16)
+        self.logged_as_lb = LoggedAsLabel(size_hint = (1, 0.3),
+                                          pos_hint = {"top": 1},
+                                          font_size = 14)
         self.avatar = Image(source = 'temp/self_avatar.png',
-                            size_hint = (0.2, 0.2),
-                            pos_hint = {"top": 0.1, "right": 0.2})
+                            size_hint = (0.5, 0.61),
+                            pos_hint = {"top": 0.65, "right": 0.53},
+                            allow_stretch = True)
+
+        self.add_widget(self.container)
+
+        self.container.add_widget(self.left_bar)
+        self.container.add_widget(self.divider)
+        self.container.add_widget(self.right_bar)
+
+        self.left_bar.add_widget(self.menu_label)
+        self.left_bar.add_widget(self.info_box)
+        self.left_bar.add_widget(self.profile_bt)
+        self.left_bar.add_widget(self.logout_bt)
+        self.left_bar.add_widget(self.settings_bt)
+        self.left_bar.add_widget(self.help_bt)
+        self.left_bar.add_widget(self.quit_bt)
+
+        self.info_box.add_widget(self.avatar)
+        self.info_box.add_widget(self.logged_as_lb)
+
+        self.right_bar.add_widget(self.add_bar)
+        self.right_bar.add_widget(self.users_disp)
 
 
 class UserRecord(BoxLayout):
@@ -980,7 +1055,7 @@ class LoginScreen(Screen):
         self.lb_log = RegLabel(text = "Login")
 
         self.to_register = InputButton(size_hint = (0.3, 1),
-                                       font_name = "fonts/ionicons_semibold.ttf",
+                                       font_name = "fonts/ionicons_regular.ttf",
                                        text = "[size=18][/size] Register",
                                        markup = True,
                                        on_release = app.to_register,
@@ -1020,6 +1095,7 @@ class LoginScreen(Screen):
         self.show_psw = ShowPswdButton(size_hint = (0.4, 0.15),
                                        pos_hint = {"top": 0.16, "right": 0.4},
                                        text = ' Show password',
+                                       font_name = "fonts/ionicons_regular.ttf",
                                        background_color = (0, 0, 0, 0))
 
         self.add_widget(self.top_box)
@@ -1088,6 +1164,7 @@ class ChatApp(App):
     def to_menu(self, *args):
         Window.size = (500, 450)
         self.screens.current = 'menu'
+        self.menu_scr.avatar.reload()
 
     def register(self, bt):
         if not re.match(self.nick_ptrn,
@@ -1098,6 +1175,8 @@ class ChatApp(App):
         else:
             'register'
             _Image.new('RGB', (1, 1)).save('temp/self_avatar.png', 'PNG')
+            self.nick = self.register_scr.tx_usr.text
+            self.menu_scr.logged_as_lb.text = "Logged in as\n" + self.nick
             self.to_menu()
 
     def login(self, bt):
@@ -1105,7 +1184,9 @@ class ChatApp(App):
             ErrorDisp(self.wrong_pswd).open()
         else:
             'login'
-            _Image.new('RGB', (1, 1)).save('PNG', 'temp/self_avatar.png')
+            _Image.new('RGB', (1, 1)).save('temp/self_avatar.png', 'PNG')
+            self.nick = self.login_scr.tx_usr.text
+            self.menu_scr.logged_as_lb.text = "Logged in as\n" + self.nick
             self.to_menu()
 
     def width_modify(self, inst):
@@ -1240,6 +1321,10 @@ class ChatApp(App):
     def hide_profile(self, bt):
         self.screens.transition.direction = "right"
         self.screens.current = 'main'
+
+    def on_stop(self):
+        for i in os.scandir('temp'):
+            os.remove(i.path)
 
     def build(self):
         Window.clearcolor = (0.71, 0.85, 1, 1)
