@@ -10,6 +10,9 @@ import string, re, os
 from datetime import datetime
 from PIL import Image as _Image
 
+if not os.path.isdir('temp'):
+    os.mkdir('temp')
+
 from kivy.app import App
 from kivy.lang import Builder
 from kivy.core.window import Window
@@ -1325,6 +1328,7 @@ class ChatApp(App):
     def on_stop(self):
         for i in os.scandir('temp'):
             os.remove(i.path)
+        os.rmdir('temp')
 
     def build(self):
         Window.clearcolor = (0.71, 0.85, 1, 1)
