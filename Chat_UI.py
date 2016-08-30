@@ -47,6 +47,7 @@ Builder.load_string('''
 
 <Button>:
     color: 1, 1, 1, 1
+    disabled_color: 1, 1, 1, 1
 
 <Popup>:
     size_hint: None, None
@@ -205,6 +206,30 @@ Builder.load_string('''
     background_down: 'textures/button/down.png'
     background_disabled_normal: 'textures/button/disabled.png'
     font_name: 'fonts/ionicons_semibold.ttf'
+
+<MenuAddBar>:
+    canvas.before:
+        Color:
+            rgba: 0.86, 0.86, 0.86, 1
+        Rectangle:
+            pos: self.pos
+            size: self.size
+        Color:
+            rgba: 0.16, 0.36, 0.56, 1
+        Rectangle:
+            pos: self.x, self.y + 1
+            size: self.width, self.height - 2
+    Widget:
+        size_hint: 0.7, 1
+    Button:
+        id: add_bt
+        text: "[size=20][/size] Add"
+        size_hint: 0.3, 1
+        markup: True
+        font_name: 'fonts/ionicons_semibold.ttf'
+        font_size: 17
+        background_normal: 'textures/button/add_bt_normal.png'
+        background_down: 'textures/button/inputbt_down.png'
 
 #<MenuButton>:
     #font_size: 16
@@ -438,6 +463,25 @@ Builder.load_string('''
     font_size: 12
     markup: True
 
+<RecordDivider>:
+    height: 15
+    color: 1, 1, 1, 1
+    font_size: 12
+    text_size: self.width - 10, self.height
+    halign: 'left'
+    size_hint: 1, None
+    canvas.before:
+        Color:
+            rgba: 1, 1, 1, 1
+        Rectangle:
+            pos: self.pos
+            size: self.size
+        Color:
+            rgba: 0.16, 0.36, 0.56, 1
+        Rectangle:
+            pos: self.x + 1, self.y + 1
+            size: self.width - 2, self.height - 2
+
 <RegLabel>:
     color: 1, 1, 1, 1
     font_name: 'fonts/ionicons_semibold.ttf'
@@ -516,6 +560,11 @@ Builder.load_string('''
         Ellipse:
             pos: self.x + 10, self.y + 10
             size: 10, 10
+
+<UsernameLabel>:
+    text_size: self.width - 10, self.height
+    halign: 'left'
+    valign: 'center'
 ''')
 
 
@@ -753,11 +802,11 @@ class RegScreen(Screen):
 
         self.lb_reg = RegLabel(text = "Register")
 
-        self.to_login = InputButton(size_hint = (0.3, 1),
+        self.to_login = InputButton(size_hint = (0.25, 1),
                                     font_name = "fonts/ionicons_regular.ttf",
                                     text = " Login",
                                     on_release = app.to_login,
-                                    background_normal = 'textures/button/topbt_normal.png')
+                                    background_normal = 'textures/button/add_bt_normal.png')
 
         self.lb_usr = Label(size_hint = (0.28, 0.03),
                             pos_hint = {"top": 0.75, "right": 0.255},
@@ -865,17 +914,53 @@ class MenuDivider(Widget):
     pass
 
 
+class RecordDivider(Label):
+    pass
+
+
 class LoggedAsLabel(Label):
     pass
 
 
+class MenuAddBar(BoxLayout):
+    pass
+
+
+class UsernameLabel(Label):
+    pass
+
+
 class MenuScreen(Screen):
+    def build_usr_list(self, users):
+        # online, name
+        self.users_disp.clear_widgets()
+        add = self.users_disp.add_widget
+        add(self.div_favs)
+        for i in users[0]:
+            add(FavRecord(*i))
+        add(self.div_requests)
+        for i in users[1]:
+            add(RequestGotRecord(*i))
+        add(self.div_online)
+        for i in users[2]:
+            add(FriendRecord(*i))
+        add(self.div_offline)
+        for i in users[3]:
+            add(FriendRecord(*i))
+        add(self.div_req_sent)
+        for i in users[4]:
+            add(RequestSentRecord(*i))
+        add(self.div_blacklist)
+        for i in users[5]:
+            add(BlacklistRecord(*i))
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.container = BoxLayout()
         self.left_bar = BoxLayout(size_hint = (0.4, 1),
                                   orientation = "vertical")
-        self.right_bar = BoxLayout(size_hint = (0.6, 1))
+        self.right_bar = BoxLayout(size_hint = (0.6, 1),
+                                   orientation = "vertical")
         self.divider = MenuDivider(size_hint = (0.01, 1))
 
         self.menu_label = RegLabel(text = "Menu",
@@ -885,7 +970,8 @@ class MenuScreen(Screen):
         self.profile_bt = MenuButton(text = ('', "Profile"),
                                      num = (14, 14))
         self.logout_bt = MenuButton(text = ('', 'Log out'),
-                                    num = (13, 13))
+                                    num = (13, 13),
+                                    on_release = app.logout)
         self.settings_bt = MenuButton(text = ('', 'Settings'),
                                       num = (12, 13))
         self.help_bt = MenuButton(text = ('', 'Help'),
@@ -893,8 +979,9 @@ class MenuScreen(Screen):
         self.quit_bt = MenuButton(text = ('', 'Quit'),
                                   num = (16, 16))
 
-        self.add_bar = BoxLayout()
-        self.users_disp = GridLayout()
+        self.add_bar = MenuAddBar(size_hint = (1, 0.105))
+        self.disp_scroll = ScrollView(do_scroll_x = False)
+        self.users_disp = GridLayout(cols = 1)
 
         self.logged_as_lb = LoggedAsLabel(size_hint = (1, 0.3),
                                           pos_hint = {"top": 1},
@@ -903,6 +990,15 @@ class MenuScreen(Screen):
                             size_hint = (0.5, 0.61),
                             pos_hint = {"top": 0.65, "right": 0.53},
                             allow_stretch = True)
+
+        self.add_button = self.add_bar.ids['add_bt']
+
+        self.div_favs = RecordDivider(text = "favorites")
+        self.div_requests = RecordDivider(text = "add requests")
+        self.div_online = RecordDivider(text = "online")
+        self.div_offline = RecordDivider(text = "offline")
+        self.div_req_sent = RecordDivider(text = "request sent")
+        self.div_blacklist = RecordDivider(text = "blacklist")
 
         self.add_widget(self.container)
 
@@ -922,24 +1018,37 @@ class MenuScreen(Screen):
         self.info_box.add_widget(self.logged_as_lb)
 
         self.right_bar.add_widget(self.add_bar)
-        self.right_bar.add_widget(self.users_disp)
+        self.right_bar.add_widget(self.disp_scroll)
+        self.disp_scroll.add_widget(self.users_disp)
 
 
 class UserRecord(BoxLayout):
     def more_action(self, bt):
         self.opts.open(self.more)
+        print('y u no work')                                             # deal with this
 
-    def __init__(self, online, name, **kwargs):
+    def __init__(self, name, online, **kwargs):
         super().__init__(**kwargs)
-        self.status = Status(online = online)
-        self.name = Label(text = name)
+        self.status = Status(online = online,
+                             size_hint = (0.1, 1))
+        self.name = UsernameLabel(text = name,
+                                  size_hint = (0.35, 1))
+        self.placeholder = Widget(size_hint = (0.4, 1))
         self.more = Button(text = "",
+                           font_name = 'fonts/ionicons.ttf',
+                           font_size = 18,
+                           color = (0, 0, 0, 1),
+                           size_hint = (0.15, 1),
+                           background_color = (0, 0, 0, 0),
                            on_release = self.more_action)
         self.opts = DropDown()
         self.opt_layout = BoxLayout(orientation = "vertical")
+        self.size_hint = [1, None]
+        self.height = 30
 
         self.add_widget(self.status)
         self.add_widget(self.name)
+        self.add_widget(self.placeholder)
         self.add_widget(self.more)
         self.opts.add_widget(self.opt_layout)
 
@@ -951,8 +1060,8 @@ class OptButton(Button):
 
 
 class FavRecord(UserRecord):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.profile = OptButton(self,
                                  text = "Profile",
                                  on_press = app.to_profile)
@@ -973,8 +1082,8 @@ class FavRecord(UserRecord):
 
 
 class FriendRecord(UserRecord):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.profile = OptButton(self,
                                  text = "Profile",
                                  on_press = app.to_profile)
@@ -995,8 +1104,8 @@ class FriendRecord(UserRecord):
 
 
 class RequestGotRecord(UserRecord):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.request_msg = OptButton(self,
                                      text = "Request message",
                                      on_press = app.get_request_msg)
@@ -1013,8 +1122,8 @@ class RequestGotRecord(UserRecord):
 
 
 class RequestSentRecord(UserRecord):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.take_back = OptButton(self,
                                    text = "Take back",
                                    on_press = app.take_request_back)
@@ -1023,8 +1132,8 @@ class RequestSentRecord(UserRecord):
 
 
 class BlacklistRecord(UserRecord):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.profile = OptButton(self,
                                  text = "Profile",
                                  on_press = app.to_profile)
@@ -1057,12 +1166,12 @@ class LoginScreen(Screen):
 
         self.lb_log = RegLabel(text = "Login")
 
-        self.to_register = InputButton(size_hint = (0.3, 1),
+        self.to_register = InputButton(size_hint = (0.25, 1),
                                        font_name = "fonts/ionicons_regular.ttf",
                                        text = "[size=18][/size] Register",
                                        markup = True,
                                        on_release = app.to_register,
-                                       background_normal = 'textures/button/topbt_normal.png')
+                                       background_normal = 'textures/button/add_bt_normal.png')
 
         self.lb_usr = Label(size_hint = (0.28, 0.03),
                             pos_hint = {"top": 0.67, "right": 0.255},
@@ -1086,7 +1195,7 @@ class LoginScreen(Screen):
                                  checker = self)
 
         self.bt_next = Button(size_hint = (0.4, 0.18),
-                              pos_hint = {"top": 0.16, "right": 0.94},
+                              pos_hint = {"top": 0.165, "right": 0.94},
                               text = "Next",
                               font_size = 16,
                               disabled = True,
@@ -1124,52 +1233,63 @@ class ChatApp(App):
     wrong_pswd = ('You entered a wrong password for this username. '
                   'Try again')
 
-    def to_login(self, bt):
+    def to_login(self, bt = None):
         Window.size = (370, 200)
         self.screens.transition = self.no_trans
         self.screens.current = 'login'
 
-    def to_register(self, bt):
+    def to_register(self, bt = None):
         Window.size = (370, 240)
         self.screens.transition = self.no_trans
         self.screens.current = 'register'
 
-    def to_profile(self, bt):
+    def to_profile(self, bt = None):
         pass
 
-    def add_favs(self, bt):
-        pass
+    def add_favs(self, bt = None):
+        print('add_favs')
 
-    def remove_favs(self, bt):
-        pass
+    def remove_favs(self, bt = None):
+        print('remove_favs')
 
-    def add_friends(self, bt):
-        pass
+    def add_friends(self, bt = None):
+        print('add_friends')
 
-    def remove_friends(self, bt):
-        pass
+    def remove_friends(self, bt = None):
+        print('remove_friends')
 
-    def add_bl(self, bt):
-        pass
+    def add_bl(self, bt = None):
+        print('add_bl')
 
-    def remove_bl(self, bt):
-        pass
+    def remove_bl(self, bt = None):
+        print('remove_bl')
 
-    def get_request_msg(self, bt):
-        pass
+    def get_request_msg(self, bt = None):
+        print('get_request_msg')
 
-    def accept_request(self, bt):
-        pass
+    def accept_request(self, bt = None):
+        print('accept_request')
 
-    def decline_request(self, bt):
-        pass
+    def decline_request(self, bt = None):
+        print('decline_request')
 
-    def to_menu(self, *args):
+    def take_request_back(self, bt = None):
+        print('take_request_back')
+
+    def get_user_groups(self, bt = None):
+        self.menu_scr.build_usr_list([[('user1', True)],
+                                      [('user2', False)],
+                                      [('user3', True)],
+                                      [('user4', False)],
+                                      [('user5', True)],
+                                      [('user6', False)]])
+
+    def to_menu(self, bt = None):
         Window.size = (500, 450)
         self.screens.current = 'menu'
         self.menu_scr.avatar.reload()
 
-    def register(self, bt):
+    def register(self, bt = None):
         if not re.match(self.nick_ptrn,
                         self.register_scr.tx_usr.text):
             ErrorDisp(self.invalid_nick).open()
@@ -1180,9 +1300,10 @@ class ChatApp(App):
             _Image.new('RGB', (1, 1)).save('temp/self_avatar.png', 'PNG')
             self.nick = self.register_scr.tx_usr.text
             self.menu_scr.logged_as_lb.text = "Logged in as\n" + self.nick
+            self.get_user_groups()
             self.to_menu()
 
-    def login(self, bt):
+    def login(self, bt = None):
         if not 'password_correct':
             ErrorDisp(self.wrong_pswd).open()
         else:
@@ -1190,7 +1311,15 @@ class ChatApp(App):
             _Image.new('RGB', (1, 1)).save('temp/self_avatar.png', 'PNG')
             self.nick = self.login_scr.tx_usr.text
             self.menu_scr.logged_as_lb.text = "Logged in as\n" + self.nick
+            self.get_user_groups()
             self.to_menu()
+
+    def logout(self, bt = None):
+        self.login_scr.tx_usr.text = ''
+        self.login_scr.tx_pass.text = ''
+        self.register_scr.tx_usr.text = ''
+        self.register_scr.tx_pass.text = ''
+        self.to_login()
 
     def width_modify(self, inst):
         min_width = 160
