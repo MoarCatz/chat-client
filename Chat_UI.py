@@ -91,6 +91,9 @@ Builder.load_string('''
     halign: "left"
     valign: "top"
 
+<FullSizeButton>:
+    text_size: self.width - 20, self.height
+
 <HelpBar>:
     MenuButton:
         disabled: True
@@ -200,12 +203,6 @@ Builder.load_string('''
         RoundedRectangle:
             pos: -27, 110
             size: 350, 40
-
-<LogoutButton>:
-    background_normal: 'textures/button/normal.png'
-    background_down: 'textures/button/down.png'
-    background_disabled_normal: 'textures/button/disabled.png'
-    font_name: 'fonts/ionicons_semibold.ttf'
 
 <MenuAddBar>:
     canvas.before:
@@ -326,6 +323,14 @@ Builder.load_string('''
     size_hint_x: None
     width: self.texture_size[0]
     font_size: 13
+
+<OptButton>:
+    size_hint_y: None
+    font_size: 12
+    background_normal: 'textures/button/drop_opt.png'
+    background_down: 'textures/button/drop_opt_down.png'
+    color: 0, 0, 0, 1
+    height: 20
 
 <PersonLayout>:
     canvas.after:
@@ -561,6 +566,12 @@ Builder.load_string('''
             pos: self.x + 10, self.y + 10
             size: 10, 10
 
+<YesNoButton>:
+    background_normal: 'textures/button/normal.png'
+    background_down: 'textures/button/down.png'
+    background_disabled_normal: 'textures/button/disabled.png'
+    font_name: 'fonts/ionicons_semibold.ttf'
+
 <UsernameLabel>:
     text_size: self.width - 10, self.height
     halign: 'left'
@@ -680,7 +691,7 @@ class ProfileButton(Button):
     pass
 
 
-class LogoutButton(Button):
+class YesNoButton(Button):
     pass
 
 
@@ -930,6 +941,61 @@ class UsernameLabel(Label):
     pass
 
 
+class FullSizeButton(Button):
+    pass
+
+
+class YesNoDialog(Popup):
+    def ch_yes(self, bt):
+        pass
+
+    def ch_no(self, bt):
+        pass
+
+    def __init__(self, title, question):
+        box = BoxLayout(orientation = "vertical")
+        self.height = 150
+        self.title = title
+        self.title_size = 16
+
+        question_lb = Label(size_hint = (1, 0.6),
+                            text = question,
+                            color = (1, 1, 1, 1),
+                            font_name = "fonts/ionicons_semibold.ttf")
+
+        answers = BoxLayout(size_hint = (1, 0.4),
+                                 spacing = 4,
+                                 padding = 2)
+        yes = YesNoButton(text = " Yes",
+                          on_release = self.ch_yes)
+
+        no = YesNoButton(text = " No",
+                         on_release = self.ch_no)
+
+        box.add_widget(question_lb)
+        box.add_widget(answers)
+
+        answers.add_widget(yes)
+        answers.add_widget(no)
+
+        self.content = box
+        super().__init__()
+
+
+class LogoutDialog(YesNoDialog):
+    def __init__(self):
+        super().__init__(" Log out",
+                         "Do you want to log out?")
+
+    def ch_yes(self, bt):
+        self.dismiss()
+        Clock.schedule_once(app.logout, 0.2)
+
+    def ch_no(self, bt):
+        self.dismiss()
+
+
+
 class MenuScreen(Screen):
     def build_usr_list(self, users):
         # online, name
@@ -969,9 +1035,10 @@ class MenuScreen(Screen):
         self.info_box = FloatLayout(size_hint = (1, 0.3))
         self.profile_bt = MenuButton(text = ('', "Profile"),
                                      num = (14, 14))
+        self.logout_dlg = LogoutDialog()
         self.logout_bt = MenuButton(text = ('', 'Log out'),
                                     num = (13, 13),
-                                    on_release = app.logout)
+                                    on_release = self.logout_dlg.open)
         self.settings_bt = MenuButton(text = ('', 'Settings'),
                                       num = (12, 13))
         self.help_bt = MenuButton(text = ('', 'Help'),
@@ -1025,7 +1092,7 @@ class MenuScreen(Screen):
 class UserRecord(BoxLayout):
     def more_action(self, bt):
         self.opts.open(self.more)
-        print('y u no work')                                             # deal with this
+        print('y u no work')
 
     def __init__(self, name, online, **kwargs):
         super().__init__(**kwargs)
@@ -1033,16 +1100,16 @@ class UserRecord(BoxLayout):
                              size_hint = (0.1, 1))
         self.name = UsernameLabel(text = name,
                                   size_hint = (0.35, 1))
-        self.placeholder = Widget(size_hint = (0.4, 1))
-        self.more = Button(text = "",
-                           font_name = 'fonts/ionicons.ttf',
-                           font_size = 18,
-                           color = (0, 0, 0, 1),
-                           size_hint = (0.15, 1),
-                           background_color = (0, 0, 0, 0),
-                           on_release = self.more_action)
+        self.placeholder = Widget(size_hint = (0.1, 1))
         self.opts = DropDown()
-        self.opt_layout = BoxLayout(orientation = "vertical")
+        self.more = FullSizeButton(text = '',
+                                   halign = 'right',
+                                   font_name = 'fonts/ionicons.ttf',
+                                   font_size = 25,
+                                   color = (0, 0, 0, 1),
+                                   size_hint = (0.45, 1),
+                                   background_color = (0, 0, 0, 0),
+                                   on_release = self.opts.open)
         self.size_hint = [1, None]
         self.height = 30
 
@@ -1050,7 +1117,6 @@ class UserRecord(BoxLayout):
         self.add_widget(self.name)
         self.add_widget(self.placeholder)
         self.add_widget(self.more)
-        self.opts.add_widget(self.opt_layout)
 
 
 class OptButton(Button):
@@ -1075,10 +1141,10 @@ class FavRecord(UserRecord):
                                 text = "Add to blacklist",
                                 on_press = app.add_bl)
 
-        self.opt_layout.add_widget(self.profile)
-        self.opt_layout.add_widget(self.remove_favs)
-        self.opt_layout.add_widget(self.remove_friends)
-        self.opt_layout.add_widget(self.add_bl)
+        self.opts.add_widget(self.profile)
+        self.opts.add_widget(self.remove_favs)
+        self.opts.add_widget(self.remove_friends)
+        self.opts.add_widget(self.add_bl)
 
 
 class FriendRecord(UserRecord):
@@ -1097,10 +1163,10 @@ class FriendRecord(UserRecord):
                                 text = "Add to blacklist",
                                 on_press = app.add_bl)
 
-        self.opt_layout.add_widget(self.profile)
-        self.opt_layout.add_widget(self.add_favs)
-        self.opt_layout.add_widget(self.remove_friends)
-        self.opt_layout.add_widget(self.add_bl)
+        self.opts.add_widget(self.profile)
+        self.opts.add_widget(self.add_favs)
+        self.opts.add_widget(self.remove_friends)
+        self.opts.add_widget(self.add_bl)
 
 
 class RequestGotRecord(UserRecord):
@@ -1116,9 +1182,9 @@ class RequestGotRecord(UserRecord):
                                  text = "Decline",
                                  on_press = app.decline_request)
 
-        self.opt_layout.add_widget(self.request_msg)
-        self.opt_layout.add_widget(self.accept)
-        self.opt_layout.add_widget(self.decline)
+        self.opts.add_widget(self.request_msg)
+        self.opts.add_widget(self.accept)
+        self.opts.add_widget(self.decline)
 
 
 class RequestSentRecord(UserRecord):
@@ -1128,7 +1194,7 @@ class RequestSentRecord(UserRecord):
                                    text = "Take back",
                                    on_press = app.take_request_back)
 
-        self.opt_layout.add_widget(self.take_back)
+        self.opts.add_widget(self.take_back)
 
 
 class BlacklistRecord(UserRecord):
@@ -1141,8 +1207,8 @@ class BlacklistRecord(UserRecord):
                                    text = "Remove from blacklist",
                                    on_press = app.remove_bl)
 
-        self.opt_layout.add_widget(self.profile)
-        self.opt_layout.add_widget(self.remove_bl)
+        self.opts.add_widget(self.profile)
+        self.opts.add_widget(self.remove_bl)
 
 
 class LoginScreen(Screen):
@@ -1630,27 +1696,27 @@ class ChatApp(App):
 
         self.help_text = HelpLabel()
 
-        self.logout_view = BoxLayout(orientation = "vertical")
+        #self.logout_view = BoxLayout(orientation = "vertical")
 
-        self.logout_dialog = Popup(height = 150,
-                                   title = " Log out",
-                                   title_size = 16,
-                                   content = self.logout_view)
+        #self.logout_dialog = Popup(height = 150,
+                                   #title = " Log out",
+                                   #title_size = 16,
+                                   #content = self.logout_view)
 
-        self.logout_ask = Label(size_hint = (1, 0.6),
-                                text = "Do you want to log out?",
-                                color = (1, 1, 1, 1),
-                                font_name = "fonts/ionicons_semibold.ttf")
+        #self.logout_ask = Label(size_hint = (1, 0.6),
+                                #text = "Do you want to log out?",
+                                #color = (1, 1, 1, 1),
+                                #font_name = "fonts/ionicons_semibold.ttf")
 
-        self.logout_btns = BoxLayout(size_hint = (1, 0.4),
-                                     spacing = 4,
-                                     padding = 2)
+        #self.logout_btns = BoxLayout(size_hint = (1, 0.4),
+                                     #spacing = 4,
+                                     #padding = 2)
 
-        self.logout_yes = LogoutButton(text = " Yes",
-                                       on_release = self.log_out_anim)
+        #self.logout_yes = LogoutButton(text = " Yes",
+                                       #on_release = self.log_out_anim)
 
-        self.logout_no = LogoutButton(text = " No",
-                                      on_release = self.logout_dialog.dismiss)
+        #self.logout_no = LogoutButton(text = " No",
+                                      #on_release = self.logout_dialog.dismiss)
 
         self.screens.add_widget(self.register_scr)
         self.screens.add_widget(self.login_scr)
@@ -1702,11 +1768,11 @@ class ChatApp(App):
         self.help_box.add_widget(self.help_bar)
         self.help_box.add_widget(self.help_text)
 
-        self.logout_view.add_widget(self.logout_ask)
-        self.logout_view.add_widget(self.logout_btns)
+        #self.logout_view.add_widget(self.logout_ask)
+        #self.logout_view.add_widget(self.logout_btns)
 
-        self.logout_btns.add_widget(self.logout_yes)
-        self.logout_btns.add_widget(self.logout_no)
+        #self.logout_btns.add_widget(self.logout_yes)
+        #self.logout_btns.add_widget(self.logout_no)
 
         return self.screens
 
