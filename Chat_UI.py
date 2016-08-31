@@ -8,6 +8,7 @@ Config.set('graphics', 'resizable', False)
 
 import string, re, os
 from datetime import datetime
+from functools import partial
 from PIL import Image as _Image
 
 if not os.path.isdir('temp'):
@@ -117,10 +118,11 @@ Builder.load_string('''
         Color:
             rgba: 0.5, 0.5, 0.5, 1
         Line:
-            points: self.x, self.y + self.height,\
-            self.x + self.width, self.y + self.height,\
-            self.x + self.width, self.y, self.x, self.y,\
-            self.x, self.y + self.height
+            points: self.x, self.y + self.height, \
+                    self.x + self.width, self.y + self.height, \
+                    self.x + self.width, self.y, \
+                    self.x, self.y, \
+                    self.x, self.y + self.height
     markup: True
     font_size: 15
     text_size: self.size
@@ -303,10 +305,11 @@ Builder.load_string('''
         Color:
             rgba: 0.5, 0.5, 0.5, 1
         Line:
-            points: self.x, self.y + self.height,\
-            self.x + self.width, self.y + self.height,\
-            self.x + self.width, self.y, self.x, self.y,\
-            self.x, self.y + self.height
+            points: self.x, self.y + self.height, \
+                    self.x + self.width, self.y + self.height, \
+                    self.x + self.width, self.y, \
+                    self.x, self.y, \
+                    self.x, self.y + self.height
 
 <NickInput>:
     multiline: False
@@ -329,7 +332,6 @@ Builder.load_string('''
     font_size: 12
     background_normal: 'textures/button/drop_opt.png'
     background_down: 'textures/button/drop_opt_down.png'
-    color: 0, 0, 0, 1
     height: 20
 
 <PersonLayout>:
@@ -337,10 +339,10 @@ Builder.load_string('''
         Color:
             rgba: 0.1, 0.1, 0.1, 1
         Line:
-            points: self.x, self.y + self.height,\
-            self.x + self.width, self.y + self.height,\
-            self.x + self.width, self.y, self.x, self.y,\
-            self.x, self.y + self.height
+            points: self.x, self.y + self.height, \
+                    self.x + self.width, self.y + self.height, \
+                    self.x + self.width, self.y, self.x, self.y, \
+                    self.x, self.y + self.height
 
 <PickerHead>:
     BoxLayout:
@@ -477,12 +479,12 @@ Builder.load_string('''
     size_hint: 1, None
     canvas.before:
         Color:
-            rgba: 1, 1, 1, 1
+            rgba: 0.86, 0.86, 0.86, 1
         Rectangle:
             pos: self.pos
             size: self.size
         Color:
-            rgba: 0.16, 0.36, 0.56, 1
+            rgba: 0.23, 0.23, 0.23, 1
         Rectangle:
             pos: self.x + 1, self.y + 1
             size: self.width - 2, self.height - 2
@@ -566,16 +568,33 @@ Builder.load_string('''
             pos: self.x + 10, self.y + 10
             size: 10, 10
 
+<UsernameButton>:
+    text_size: self.width - 10, self.height
+    halign: 'left'
+    valign: 'center'
+    font_size: 13
+
+<UserRecord>:
+    canvas:
+        Color:
+            rgba: 0.16, 0.36, 0.56, 1
+        Line:
+            points: self.x, self.y, \
+                    self.x + self.width, self.y, \
+                    self.x + self.width, self.y + self.height, \
+                    self.x, self.y + self.height, \
+                    self.x, self.y
+        Color:
+            rgba: 0.16, 0.36, 0.56, 0.3
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
 <YesNoButton>:
     background_normal: 'textures/button/normal.png'
     background_down: 'textures/button/down.png'
     background_disabled_normal: 'textures/button/disabled.png'
     font_name: 'fonts/ionicons_semibold.ttf'
-
-<UsernameLabel>:
-    text_size: self.width - 10, self.height
-    halign: 'left'
-    valign: 'center'
 ''')
 
 
@@ -937,7 +956,7 @@ class MenuAddBar(BoxLayout):
     pass
 
 
-class UsernameLabel(Label):
+class UsernameButton(Button):
     pass
 
 
@@ -1047,8 +1066,15 @@ class MenuScreen(Screen):
                                   num = (16, 16))
 
         self.add_bar = MenuAddBar(size_hint = (1, 0.105))
-        self.disp_scroll = ScrollView(do_scroll_x = False)
-        self.users_disp = GridLayout(cols = 1)
+
+        self.disp_scroll = ScrollView(bar_inactive_color = (0, 0, 0, 0),
+                                      bar_color = (0.3, 0.3, 0.3, 0.7),
+                                      bar_margin = 3,
+                                      do_scroll_x = False,
+                                      size_hint = (1, 1))
+        self.users_disp = GridLayout(cols = 1,
+                                     size_hint_y = None)
+        self.users_disp.bind(minimum_height = self.users_disp.setter('height'))
 
         self.logged_as_lb = LoggedAsLabel(size_hint = (1, 0.3),
                                           pos_hint = {"top": 1},
@@ -1091,31 +1117,36 @@ class MenuScreen(Screen):
 
 class UserRecord(BoxLayout):
     def more_action(self, bt):
-        self.opts.open(self.more)
-        print('y u no work')
+        self.opts.open(self)
 
     def __init__(self, name, online, **kwargs):
         super().__init__(**kwargs)
         self.status = Status(online = online,
-                             size_hint = (0.1, 1))
-        self.name = UsernameLabel(text = name,
-                                  size_hint = (0.35, 1))
-        self.placeholder = Widget(size_hint = (0.1, 1))
+                             size_hint = (0.08, 1))
+        self.name = UsernameButton(text = name,
+                                   size_hint = (0.79, 1),
+                                   background_color = (0, 0, 0, 0),
+                                   color = (0, 0, 0, 1))
         self.opts = DropDown()
+
+        #self.more = BoxLayout(size_hint = (0.45, 1))
+        #self.more_placeholder = Widget(size_hint = (0.72, 1))
         self.more = FullSizeButton(text = '',
                                    halign = 'right',
-                                   font_name = 'fonts/ionicons.ttf',
+                                   font_name = 'fonts/ionicons_regular.ttf',
                                    font_size = 25,
                                    color = (0, 0, 0, 1),
-                                   size_hint = (0.45, 1),
+                                   size_hint = (0.13, 1),
                                    background_color = (0, 0, 0, 0),
-                                   on_release = self.opts.open)
+                                   on_release = self.more_action)
         self.size_hint = [1, None]
         self.height = 30
 
+        #self.more.add_widget(self.more_placeholder)
+        #self.more.add_widget(self.more_bt)
+
         self.add_widget(self.status)
         self.add_widget(self.name)
-        self.add_widget(self.placeholder)
         self.add_widget(self.more)
 
 
@@ -1343,7 +1374,8 @@ class ChatApp(App):
         print('take_request_back')
 
     def get_user_groups(self, bt = None):
-        self.menu_scr.build_usr_list([[('user1', True)],
+        self.menu_scr.build_usr_list([[('user1', True),
+                                       ('user7', False)] * 10,
                                       [('user2', False)],
                                       [('user3', True)],
                                       [('user4', False)],
