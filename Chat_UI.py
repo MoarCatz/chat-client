@@ -18,7 +18,8 @@ from kivy.app import App
 from kivy.lang import Builder
 from kivy.core.window import Window
 from kivy.effects.scroll import ScrollEffect
-from kivy.uix.screenmanager import Screen, ScreenManager, NoTransition, SlideTransition
+from kivy.uix.screenmanager import (Screen, ScreenManager,
+                                    NoTransition, SlideTransition)
 from kivy.uix.label import Label
 from kivy.uix.widget import Widget
 from kivy.uix.textinput import TextInput
@@ -37,8 +38,8 @@ from kivy.uix.settings import Settings
 from kivy.uix.togglebutton import ToggleButton
 from kivy.uix.spinner import Spinner
 from kivy.clock import Clock
+from kivy.graphics import Ellipse
 from kivy.uix.image import Image
-
 
 Builder.load_string('''
 <Label>:
@@ -553,21 +554,6 @@ Builder.load_string('''
     background_normal: 'textures/button/normal.png'
     background_down: 'textures/button/down.png'
 
-<Status>:
-    size_hint_x: None
-    width: 30
-    canvas:
-        Color:
-            rgba: 0, 0, 0, 1
-        Ellipse:
-            pos: self.x + 9, self.y + 9
-            size: 12, 12
-        Color:
-            rgba: [0.5, 0.9, 0, 1] if root.online else [0.67, 0.79, 0.91, 1]
-        Ellipse:
-            pos: self.x + 10, self.y + 10
-            size: 10, 10
-
 <UsernameButton>:
     text_size: self.width - 10, self.height
     halign: 'left'
@@ -672,8 +658,17 @@ class PickerHead(Widget):
         app.drop_picker.open()
 
 
-class Status(Widget):
+class Status(BoxLayout):
     online = BooleanProperty(True)
+    def __init__(self, online = True, **kwargs):
+        super().__init__(**kwargs)
+        self.img = Image(source = 'textures/panels/status_on.png')
+        self.online = online
+        self.add_widget(self.img)
+
+    def on_online(self, inst, ch):
+        path = 'textures/panels/status_' + ('on.png' if ch else 'off.png')
+        self.img.source = path
 
 
 class NickLabel(Button):
@@ -973,7 +968,7 @@ class YesNoDialog(Popup):
 
     def __init__(self, title, question):
         box = BoxLayout(orientation = "vertical")
-        self.height = 150
+        self.height = 155
         self.title = title
         self.title_size = 16
 
@@ -1008,17 +1003,41 @@ class LogoutDialog(YesNoDialog):
 
     def ch_yes(self, bt):
         self.dismiss()
-        Clock.schedule_once(app.logout, 0.2)
+        Clock.schedule_once(app.logout, 0.15)
 
     def ch_no(self, bt):
         self.dismiss()
 
 
+class QuitDialog(YesNoDialog):
+    def __init__(self):
+        super().__init__(" Quit",
+                         "Do you want to quit?")
+
+    def ch_yes(self, bt):
+        self.dismiss()
+        Clock.schedule_once(app.stop, 0.15)
+
+    def ch_no(self, bt):
+        self.dismiss()
+
+
+class InfoBox(FloatLayout):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        with self.canvas:
+            self.avatar = Ellipse(size = (105, 105),
+                                  pos = (5, 250))
+        self.logged_as_lb = LoggedAsLabel(size_hint = (1, 0.25),
+                                          pos_hint = {"top": 1},
+                                          font_size = 13)
+        self.add_widget(self.logged_as_lb)
+
 
 class MenuScreen(Screen):
     def build_usr_list(self, users):
-        # online, name
         self.users_disp.clear_widgets()
+
         add = self.users_disp.add_widget
         add(self.div_favs)
         for i in users[0]:
@@ -1051,7 +1070,7 @@ class MenuScreen(Screen):
         self.menu_label = RegLabel(text = "Menu",
                                    size_hint = (1, 0.08),
                                    font_size = 17)
-        self.info_box = FloatLayout(size_hint = (1, 0.3))
+        self.info_box = InfoBox(size_hint = (1, 0.3))
         self.profile_bt = MenuButton(text = ('', "Profile"),
                                      num = (14, 14))
         self.logout_dlg = LogoutDialog()
@@ -1062,8 +1081,10 @@ class MenuScreen(Screen):
                                       num = (12, 13))
         self.help_bt = MenuButton(text = ('', 'Help'),
                                   num = (15, 16))
+        self.quit_dlg = QuitDialog()
         self.quit_bt = MenuButton(text = ('', 'Quit'),
-                                  num = (16, 16))
+                                  num = (16, 16),
+                                  on_release = self.quit_dlg.open)
 
         self.add_bar = MenuAddBar(size_hint = (1, 0.105))
 
@@ -1075,14 +1096,6 @@ class MenuScreen(Screen):
         self.users_disp = GridLayout(cols = 1,
                                      size_hint_y = None)
         self.users_disp.bind(minimum_height = self.users_disp.setter('height'))
-
-        self.logged_as_lb = LoggedAsLabel(size_hint = (1, 0.3),
-                                          pos_hint = {"top": 1},
-                                          font_size = 14)
-        self.avatar = Image(source = 'temp/self_avatar.png',
-                            size_hint = (0.5, 0.61),
-                            pos_hint = {"top": 0.65, "right": 0.53},
-                            allow_stretch = True)
 
         self.add_button = self.add_bar.ids['add_bt']
 
@@ -1107,9 +1120,6 @@ class MenuScreen(Screen):
         self.left_bar.add_widget(self.help_bt)
         self.left_bar.add_widget(self.quit_bt)
 
-        self.info_box.add_widget(self.avatar)
-        self.info_box.add_widget(self.logged_as_lb)
-
         self.right_bar.add_widget(self.add_bar)
         self.right_bar.add_widget(self.disp_scroll)
         self.disp_scroll.add_widget(self.users_disp)
@@ -1129,8 +1139,6 @@ class UserRecord(BoxLayout):
                                    color = (0, 0, 0, 1))
         self.opts = DropDown()
 
-        #self.more = BoxLayout(size_hint = (0.45, 1))
-        #self.more_placeholder = Widget(size_hint = (0.72, 1))
         self.more = FullSizeButton(text = '',
                                    halign = 'right',
                                    font_name = 'fonts/ionicons_regular.ttf',
@@ -1141,9 +1149,6 @@ class UserRecord(BoxLayout):
                                    on_release = self.more_action)
         self.size_hint = [1, None]
         self.height = 30
-
-        #self.more.add_widget(self.more_placeholder)
-        #self.more.add_widget(self.more_bt)
 
         self.add_widget(self.status)
         self.add_widget(self.name)
@@ -1318,7 +1323,7 @@ class LoginScreen(Screen):
         self.add_widget(self.bt_next)
         self.add_widget(self.show_psw)
 
-
+from random import choice
 class ChatApp(App):
     nick_ptrn = re.compile('(?![ ]+)[\w ]{2,15}')
     invalid_nick = ('The username you entered is incorrect. '
@@ -1375,7 +1380,7 @@ class ChatApp(App):
 
     def get_user_groups(self, bt = None):
         self.menu_scr.build_usr_list([[('user1', True),
-                                       ('user7', False)] * 10,
+                                       ('user7', False)],
                                       [('user2', False)],
                                       [('user3', True)],
                                       [('user4', False)],
@@ -1385,7 +1390,6 @@ class ChatApp(App):
     def to_menu(self, bt = None):
         Window.size = (500, 450)
         self.screens.current = 'menu'
-        self.menu_scr.avatar.reload()
 
     def register(self, bt = None):
         if not re.match(self.nick_ptrn,
@@ -1395,9 +1399,12 @@ class ChatApp(App):
             ErrorDisp(self.nick_taken).open()
         else:
             'register'
-            _Image.new('RGB', (1, 1)).save('temp/self_avatar.png', 'PNG')
+            av = _Image.open('textures/panels/avatar_placeholder.png')
+            av.save('temp/self_avatar.png', 'PNG')
+            av.close()
+            self.menu_scr.info_box.avatar.source = 'temp/self_avatar.png'
             self.nick = self.register_scr.tx_usr.text
-            self.menu_scr.logged_as_lb.text = "Logged in as\n" + self.nick
+            self.menu_scr.info_box.logged_as_lb.text = "Logged in as\n" + self.nick
             self.get_user_groups()
             self.to_menu()
 
@@ -1406,9 +1413,12 @@ class ChatApp(App):
             ErrorDisp(self.wrong_pswd).open()
         else:
             'login'
-            _Image.new('RGB', (1, 1)).save('temp/self_avatar.png', 'PNG')
+            av = _Image.open('textures/panels/avatar_placeholder.png')
+            av.save('temp/self_avatar.png', 'PNG')
+            av.close()
+            self.menu_scr.info_box.avatar.source = 'temp/self_avatar.png'
             self.nick = self.login_scr.tx_usr.text
-            self.menu_scr.logged_as_lb.text = "Logged in as\n" + self.nick
+            self.menu_scr.info_box.logged_as_lb.text = "Logged in as\n" + self.nick
             self.get_user_groups()
             self.to_menu()
 
@@ -1553,9 +1563,10 @@ class ChatApp(App):
         self.screens.current = 'main'
 
     def on_stop(self):
-        for i in os.scandir('temp'):
-            os.remove(i.path)
-        os.rmdir('temp')
+        if os.path.isdir('temp'):
+            for i in os.scandir('temp'):
+                os.remove(i.path)
+            os.rmdir('temp')
 
     def build(self):
         Window.clearcolor = (0.71, 0.85, 1, 1)
