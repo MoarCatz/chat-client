@@ -744,10 +744,9 @@ class PersonProfile(Profile):
         self.ids['about'].text = "I'm just a bot"
 
 
-class MyProfile(Profile):
+class SelfProfile(Profile):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.ids['avatar'].ids['src'].source = 'rogue.jpg'
 
 
 class MessageInput(TextInput):
@@ -1072,7 +1071,8 @@ class MenuScreen(Screen):
                                    font_size = 17)
         self.info_box = InfoBox(size_hint = (1, 0.3))
         self.profile_bt = MenuButton(text = ('', "Profile"),
-                                     num = (14, 14))
+                                     num = (14, 14),
+                                     on_release = app.to_self_profile)
         self.logout_dlg = LogoutDialog()
         self.logout_bt = MenuButton(text = ('', 'Log out'),
                                     num = (13, 13),
@@ -1126,6 +1126,46 @@ class MenuScreen(Screen):
 
 
 class UserRecord(BoxLayout):
+    def f_to_self_profile(self, bt):
+        self.opts.dismiss()
+        app.to_self_profile()
+
+    def f_remove_favs(self, bt):
+        self.opts.dismiss()
+        app.remove_favs()
+
+    def f_remove_friends(self, bt):
+        self.opts.dismiss()
+        app.remove_friends()
+
+    def f_add_bl(self, bt):
+        self.opts.dismiss()
+        app.add_bl()
+
+    def f_add_favs(self, bt):
+        self.opts.dismiss()
+        app.add_favs()
+
+    def f_get_request_msg(self, bt):
+        self.opts.dismiss()
+        app.get_request_msg()
+
+    def f_accept_request(self, bt):
+        self.opts.dismiss()
+        app.accept_request()
+
+    def f_decline_request(self, bt):
+        self.opts.dismiss()
+        app.decline_request()
+
+    def f_take_request_back(self, bt):
+        self.opts.dismiss()
+        app.take_request_back()
+
+    def f_remove_bl(self, bt):
+        self.opts.dismiss()
+        app.remove_bl()
+
     def more_action(self, bt):
         self.opts.open(self)
 
@@ -1166,16 +1206,16 @@ class FavRecord(UserRecord):
         super().__init__(*args, **kwargs)
         self.profile = OptButton(self,
                                  text = "Profile",
-                                 on_press = app.to_profile)
+                                 on_press = self.f_to_self_profile)
         self.remove_favs = OptButton(self,
                                      text = "Remove from favorites",
-                                     on_press = app.remove_favs)
+                                     on_press = self.f_remove_favs)
         self.remove_friends = OptButton(self,
                                         text = "Remove from friends",
-                                        on_press = app.remove_friends)
+                                        on_press = self.f_remove_friends)
         self.add_bl = OptButton(self,
                                 text = "Add to blacklist",
-                                on_press = app.add_bl)
+                                on_press = self.f_add_bl)
 
         self.opts.add_widget(self.profile)
         self.opts.add_widget(self.remove_favs)
@@ -1188,16 +1228,16 @@ class FriendRecord(UserRecord):
         super().__init__(*args, **kwargs)
         self.profile = OptButton(self,
                                  text = "Profile",
-                                 on_press = app.to_profile)
+                                 on_press = self.f_to_self_profile)
         self.add_favs = OptButton(self,
                                   text = "Add to favorites",
-                                  on_press = app.add_favs)
+                                  on_press = self.f_add_favs)
         self.remove_friends = OptButton(self,
                                         text = "Remove from friends",
-                                        on_press = app.remove_friends)
+                                        on_press = self.f_remove_friends)
         self.add_bl = OptButton(self,
                                 text = "Add to blacklist",
-                                on_press = app.add_bl)
+                                on_press = self.f_add_bl)
 
         self.opts.add_widget(self.profile)
         self.opts.add_widget(self.add_favs)
@@ -1210,13 +1250,13 @@ class RequestGotRecord(UserRecord):
         super().__init__(*args, **kwargs)
         self.request_msg = OptButton(self,
                                      text = "Request message",
-                                     on_press = app.get_request_msg)
+                                     on_press = self.f_get_request_msg)
         self.accept = OptButton(self,
                                 text = "Accept",
-                                on_press = app.accept_request)
+                                on_press = self.f_accept_request)
         self.decline = OptButton(self,
                                  text = "Decline",
-                                 on_press = app.decline_request)
+                                 on_press = self.f_decline_request)
 
         self.opts.add_widget(self.request_msg)
         self.opts.add_widget(self.accept)
@@ -1228,7 +1268,7 @@ class RequestSentRecord(UserRecord):
         super().__init__(*args, **kwargs)
         self.take_back = OptButton(self,
                                    text = "Take back",
-                                   on_press = app.take_request_back)
+                                   on_press = self.f_take_request_back)
 
         self.opts.add_widget(self.take_back)
 
@@ -1238,10 +1278,10 @@ class BlacklistRecord(UserRecord):
         super().__init__(*args, **kwargs)
         self.profile = OptButton(self,
                                  text = "Profile",
-                                 on_press = app.to_profile)
+                                 on_press = self.f_to_self_profile)
         self.remove_bl = OptButton(self,
                                    text = "Remove from blacklist",
-                                   on_press = app.remove_bl)
+                                   on_press = self.f_remove_bl)
 
         self.opts.add_widget(self.profile)
         self.opts.add_widget(self.remove_bl)
@@ -1323,7 +1363,6 @@ class LoginScreen(Screen):
         self.add_widget(self.bt_next)
         self.add_widget(self.show_psw)
 
-from random import choice
 class ChatApp(App):
     nick_ptrn = re.compile('(?![ ]+)[\w ]{2,15}')
     invalid_nick = ('The username you entered is incorrect. '
@@ -1345,8 +1384,11 @@ class ChatApp(App):
         self.screens.transition = self.no_trans
         self.screens.current = 'register'
 
-    def to_profile(self, bt = None):
-        pass
+    def to_self_profile(self, bt = None):
+        Window.size = (350, 500)
+        self.slide_trans.direction = "left"
+        self.screens.transition = self.slide_trans
+        self.screens.current = 'self_profile'
 
     def add_favs(self, bt = None):
         print('add_favs')
@@ -1599,7 +1641,7 @@ class ChatApp(App):
         self.menu_scr = MenuScreen(name = "menu")
         self.chat = Screen(name = "main")
         self.help = Screen(name = "help")
-        self.my_profile = MyProfile(name = "my_profile")
+        self.self_profile_scr = SelfProfile(name = "self_profile")
         self.person_profile = PersonProfile(name = "person_profile")
 
         #self.intro_box = BoxLayout()
@@ -1766,7 +1808,7 @@ class ChatApp(App):
         self.screens.add_widget(self.menu_scr)
         self.screens.add_widget(self.chat)
         self.screens.add_widget(self.help)
-        self.screens.add_widget(self.my_profile)
+        self.screens.add_widget(self.self_profile_scr)
         self.screens.add_widget(self.person_profile)
 
         #self.intro.add_widget(self.intro_box)
