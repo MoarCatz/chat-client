@@ -93,6 +93,19 @@ Builder.load_string('''
     halign: "left"
     valign: "top"
 
+<FramedScrollView>:
+    canvas:
+        Color:
+            rgba: 0.23, 0.23, 0.23, 1
+        Rectangle:
+            pos: self.pos
+            size: self.size
+        Color:
+            rgba: 0.86, 0.86, 0.86, 1
+        Rectangle:
+            pos: self.x + 1, self.y + 1
+            size: self.width - 2, self.height - 2
+
 <FullSizeButton>:
     text_size: self.width - 20, self.height
 
@@ -288,11 +301,9 @@ Builder.load_string('''
 <MessageInput>:
     background_normal: 'textures/textinput/msginput_unfocused.png'
     background_active: 'textures/textinput/msginput_focused.png'
-    font_size: 13
-    font_name: "fonts/ionicons_regular.ttf"
+    font_name: "fonts/OpenSans-Regular.ttf"
     cursor_color: 0, 0, 0, 1
     write_tab: False
-    hint_text: self.placeholder
 
 <MessageView>:
     canvas:
@@ -423,7 +434,7 @@ Builder.load_string('''
     MenuButton:
         text: " Back"
         size_hint: 0.17, 1
-        on_release: app.hide_screen(self, 'right')
+        on_release: app.to_menu()
     MenuButton:
         disabled: True
         size_hint: 1, 1
@@ -750,8 +761,9 @@ class SelfProfile(Profile):
 
 
 class MessageInput(TextInput):
-    def __init__(self, **kwargs):
-        self.placeholder = 'Your message here...'
+    def __init__(self, plch, **kwargs):
+        self.placeholder = plch
+        self.hint_text = self.placeholder
         super().__init__(**kwargs)
 
     def on_focus(self, inst, focus):
@@ -900,15 +912,15 @@ class ErrorLabel(Label):
 
 class ErrorDisp(Popup):
     def __init__(self, text, **kwargs):
-        cont = FloatLayout()
-        btn = Button(size_hint = (0.4, 0.2),
+        self.cont = FloatLayout()
+        self.btn = Button(size_hint = (0.4, 0.2),
                      pos_hint = {"top": 0.163, "right": 0.94},
                      text = "Back",
                      font_size = 15,
                      background_normal = "textures/button/normal_intro.png",
                      background_down = "textures/button/down_intro.png",
                      on_release = self.dismiss)
-        lb = ErrorLabel(text = text,
+        self.lb = ErrorLabel(text = text,
                         font_size = 13,
                         color = (1, 1, 1, 1),
                         size_hint = (0.95, 0.8),
@@ -916,10 +928,10 @@ class ErrorDisp(Popup):
                         halign = "left",
                         valign = "top")
 
-        cont.add_widget(lb)
-        cont.add_widget(btn)
+        cont.add_widget(self.lb)
+        cont.add_widget(self.btn)
         super().__init__(title = 'Error',
-                         content = cont,
+                         content = self.cont,
                          height = 180,
                          **kwargs)
 
@@ -1039,23 +1051,23 @@ class MenuScreen(Screen):
 
         add = self.users_disp.add_widget
         add(self.div_favs)
-        for i in users[0]:
-            add(FavRecord(*i))
+        for online, name in users[0]:
+            add(FavRecord(online, name))
         add(self.div_requests)
-        for i in users[1]:
-            add(RequestGotRecord(*i))
+        for online, name in users[1]:
+            add(RequestGotRecord(online, name))
         add(self.div_online)
-        for i in users[2]:
-            add(FriendRecord(*i))
+        for online, name in users[2]:
+            add(FriendRecord(online, name))
         add(self.div_offline)
-        for i in users[3]:
-            add(FriendRecord(*i))
+        for online, name in users[3]:
+            add(FriendRecord(online, name))
         add(self.div_req_sent)
-        for i in users[4]:
-            add(RequestSentRecord(*i))
+        for online, name in users[4]:
+            add(RequestSentRecord(online, name))
         add(self.div_blacklist)
-        for i in users[5]:
-            add(BlacklistRecord(*i))
+        for online, name in users[5]:
+            add(BlacklistRecord(online, name))
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -1069,18 +1081,26 @@ class MenuScreen(Screen):
         self.menu_label = RegLabel(text = "Menu",
                                    size_hint = (1, 0.08),
                                    font_size = 17)
+
         self.info_box = InfoBox(size_hint = (1, 0.3))
+
         self.profile_bt = MenuButton(text = ('', "Profile"),
                                      num = (14, 14),
                                      on_release = app.to_self_profile)
+
         self.logout_dlg = LogoutDialog()
         self.logout_bt = MenuButton(text = ('', 'Log out'),
                                     num = (13, 13),
                                     on_release = self.logout_dlg.open)
+
         self.settings_bt = MenuButton(text = ('', 'Settings'),
-                                      num = (12, 13))
+                                      num = (12, 13),
+                                      on_release = app.to_settings)
+
         self.help_bt = MenuButton(text = ('', 'Help'),
-                                  num = (15, 16))
+                                  num = (15, 16),
+                                  on_release = app.to_help)
+
         self.quit_dlg = QuitDialog()
         self.quit_bt = MenuButton(text = ('', 'Quit'),
                                   num = (16, 16),
@@ -1098,6 +1118,8 @@ class MenuScreen(Screen):
         self.users_disp.bind(minimum_height = self.users_disp.setter('height'))
 
         self.add_button = self.add_bar.ids['add_bt']
+        self.add_person_popup = AddPersonPopup()
+        self.add_button.on_press = self.add_person_popup.open
 
         self.div_favs = RecordDivider(text = "favorites")
         self.div_requests = RecordDivider(text = "add requests")
@@ -1126,9 +1148,10 @@ class MenuScreen(Screen):
 
 
 class UserRecord(BoxLayout):
-    def f_to_self_profile(self, bt):
+    def f_to_profile(self, bt):
         self.opts.dismiss()
-        app.to_self_profile()
+        nick = bt.record.name.text
+        app.to_profile(nick)
 
     def f_remove_favs(self, bt):
         self.opts.dismiss()
@@ -1206,7 +1229,7 @@ class FavRecord(UserRecord):
         super().__init__(*args, **kwargs)
         self.profile = OptButton(self,
                                  text = "Profile",
-                                 on_press = self.f_to_self_profile)
+                                 on_press = self.f_to_profile)
         self.remove_favs = OptButton(self,
                                      text = "Remove from favorites",
                                      on_press = self.f_remove_favs)
@@ -1228,7 +1251,7 @@ class FriendRecord(UserRecord):
         super().__init__(*args, **kwargs)
         self.profile = OptButton(self,
                                  text = "Profile",
-                                 on_press = self.f_to_self_profile)
+                                 on_press = self.f_to_profile)
         self.add_favs = OptButton(self,
                                   text = "Add to favorites",
                                   on_press = self.f_add_favs)
@@ -1248,6 +1271,9 @@ class FriendRecord(UserRecord):
 class RequestGotRecord(UserRecord):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.profile = OptButton(self,
+                                 text = "Profile",
+                                 on_press = self.f_to_profile)
         self.request_msg = OptButton(self,
                                      text = "Request message",
                                      on_press = self.f_get_request_msg)
@@ -1258,6 +1284,7 @@ class RequestGotRecord(UserRecord):
                                  text = "Decline",
                                  on_press = self.f_decline_request)
 
+        self.opts.add_widget(self.profile)
         self.opts.add_widget(self.request_msg)
         self.opts.add_widget(self.accept)
         self.opts.add_widget(self.decline)
@@ -1278,13 +1305,46 @@ class BlacklistRecord(UserRecord):
         super().__init__(*args, **kwargs)
         self.profile = OptButton(self,
                                  text = "Profile",
-                                 on_press = self.f_to_self_profile)
+                                 on_press = self.f_to_profile)
         self.remove_bl = OptButton(self,
                                    text = "Remove from blacklist",
                                    on_press = self.f_remove_bl)
 
         self.opts.add_widget(self.profile)
         self.opts.add_widget(self.remove_bl)
+
+
+class SearchRecord(UserRecord):
+    def f_to_profile(self, bt):
+        self.opts.dismiss()
+        nick = bt.record.name.text
+        app.to_profile(nick, from_search = True)
+
+    def f_ask_msg(self, bt):
+        self.opts.dismiss()
+        self.popup.dismiss()
+        self.popup.msg_popup.open()
+
+    def f_send_request(self, bt = None):
+        # msg = self.popup.msg_input.text
+        # name = self.name.text
+        # make sure to clean the msg field
+        self.popup.msg_popup.dismiss()
+        app.send_request()
+
+    def __init__(self, popup, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.popup = popup
+        self.popup.msg_confirm.on_release = self.f_send_request
+        self.profile = OptButton(self,
+                                 text = "Profile",
+                                 on_press = self.f_to_profile)
+        self.send_req = OptButton(self,
+                                   text = "Send add request",
+                                   on_press = self.f_ask_msg)
+
+        self.opts.add_widget(self.profile)
+        self.opts.add_widget(self.send_req)
 
 
 class LoginScreen(Screen):
@@ -1363,6 +1423,83 @@ class LoginScreen(Screen):
         self.add_widget(self.bt_next)
         self.add_widget(self.show_psw)
 
+
+class FramedScrollView(ScrollView):
+    pass
+
+
+class SearchInput(MessageInput):
+    def __init__(self, cont, plch, **kwargs):
+        super().__init__(plch, **kwargs)
+        self.cont = cont
+
+    def on_text(self, inst, text):
+        if len(text) > 15:
+            self.text = text[:15]
+        inst.cont.update_result(text)
+
+class AddPersonPopup(Popup):
+    def update_result(self, query):
+        self.users_disp.clear_widgets()
+
+        add = self.users_disp.add_widget
+        for online, name in app.search_username(query):
+            add(SearchRecord(self, online, name))
+
+    def on_dismiss(self):
+        if not self.keep_text:
+            self.tx_nick.text = ''
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.title = 'Add a user'
+        self.size_hint = (None, None)
+        self.size = 400, 350
+        self.keep_text = False
+        self.box = BoxLayout(orientation = 'vertical',
+                             spacing = 15,
+                             padding = 10)
+        self.tx_nick = SearchInput(self,
+                                   'Enter a username...',
+                                   size_hint = (1, 0.12),
+                                   multiline = False,
+                                   font_size = 13,
+                                   on_text = self.update_result)
+
+        self.disp_scroll = FramedScrollView(bar_inactive_color = (0, 0, 0, 0),
+                                            bar_color = (0.3, 0.3, 0.3, 0.7),
+                                            bar_margin = 3,
+                                            do_scroll_x = False,
+                                            size_hint = (1, 0.88))
+        self.users_disp = GridLayout(cols = 1,
+                                     size_hint_y = None)
+        self.users_disp.bind(minimum_height = self.users_disp.setter('height'))
+
+        self.msg_popup = Popup(height = 180,
+                               title = 'Message (optional)',
+                               title_font = 'fonts/OpenSans-Regular.ttf')
+        self.msg_cont = FloatLayout()
+        self.msg_input = MessageInput('',
+                                      size_hint = (0.98, 0.65),
+                                      font_size = 13,
+                                      pos_hint = {"top": 0.95, "center_x": 0.5})
+        self.msg_confirm = Button(size_hint = (0.4, 0.25),
+                                  pos_hint = {"top": 0.22, "right": 0.94},
+                                  text = "Confirm",
+                                  font_size = 15,
+                                  background_normal = "textures/button/normal_intro.png",
+                                  background_down = "textures/button/down_intro.png")
+
+        self.msg_cont.add_widget(self.msg_input)
+        self.msg_cont.add_widget(self.msg_confirm)
+        self.msg_popup.content = self.msg_cont
+
+        self.add_widget(self.box)
+        self.box.add_widget(self.tx_nick)
+        self.box.add_widget(self.disp_scroll)
+        self.disp_scroll.add_widget(self.users_disp)
+
+
 class ChatApp(App):
     nick_ptrn = re.compile('(?![ ]+)[\w ]{2,15}')
     invalid_nick = ('The username you entered is incorrect. '
@@ -1386,9 +1523,29 @@ class ChatApp(App):
 
     def to_self_profile(self, bt = None):
         Window.size = (350, 500)
-        self.slide_trans.direction = "left"
-        self.screens.transition = self.slide_trans
+        self.screens.transition = self.no_trans
         self.screens.current = 'self_profile'
+
+    def to_menu(self, bt = None):
+        Window.size = (500, 450)
+        self.screens.transition = self.no_trans
+        self.screens.current = 'menu'
+
+    def to_profile(self, nick, from_search = False):
+        if from_search:
+            p = self.menu_scr.add_person_popup
+            p.keep_text = True
+            p.dismiss()
+            p.keep_text = False
+
+        Window.size = (350, 500)
+        self.screens.current = 'profile'
+
+    def to_settings(self, bt = None):
+        pass
+
+    def to_help(self, bt = None):
+        pass
 
     def add_favs(self, bt = None):
         print('add_favs')
@@ -1420,6 +1577,9 @@ class ChatApp(App):
     def take_request_back(self, bt = None):
         print('take_request_back')
 
+    def send_request(self, bt = None):
+        print('send_request')
+
     def get_user_groups(self, bt = None):
         self.menu_scr.build_usr_list([[('user1', True),
                                        ('user7', False)],
@@ -1428,10 +1588,6 @@ class ChatApp(App):
                                       [('user4', False)],
                                       [('user5', True)],
                                       [('user6', False)]])
-
-    def to_menu(self, bt = None):
-        Window.size = (500, 450)
-        self.screens.current = 'menu'
 
     def register(self, bt = None):
         if not re.match(self.nick_ptrn,
@@ -1470,6 +1626,11 @@ class ChatApp(App):
         self.register_scr.tx_usr.text = ''
         self.register_scr.tx_pass.text = ''
         self.to_login()
+
+    def search_username(self, query):
+        'search_username'
+        return [(query, True),
+                (query + '1', False)]
 
     def width_modify(self, inst):
         min_width = 160
@@ -1642,8 +1803,7 @@ class ChatApp(App):
         self.chat = Screen(name = "main")
         self.help = Screen(name = "help")
         self.self_profile_scr = SelfProfile(name = "self_profile")
-        self.person_profile = PersonProfile(name = "person_profile")
-
+        self.profile_scr = PersonProfile(name = "profile")
         #self.intro_box = BoxLayout()
         #self.reg_box = RegisterLayout(size_hint = (0.7, 1))
         #self.name_box = PersonLayout(size_hint = (0.3, 1))
@@ -1746,7 +1906,8 @@ class ChatApp(App):
 
         self.input_panel = InputBox(size_hint = (0.9, 1))
 
-        self.msg_input = MessageInput()
+        self.msg_input = MessageInput('Your message here...',
+                                      font_size = 13)
 
         self.bt_send = InputButton(size_hint = (1, 0.35),
                                    text = "",
@@ -1809,7 +1970,7 @@ class ChatApp(App):
         self.screens.add_widget(self.chat)
         self.screens.add_widget(self.help)
         self.screens.add_widget(self.self_profile_scr)
-        self.screens.add_widget(self.person_profile)
+        self.screens.add_widget(self.profile_scr)
 
         #self.intro.add_widget(self.intro_box)
         #self.intro_box.add_widget(self.reg_box)
