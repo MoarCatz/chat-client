@@ -8,8 +8,10 @@ Config.set('graphics', 'resizable', False)
 
 import string, re, os
 from datetime import datetime
+import time
 from functools import partial
 from PIL import Image as _Image
+from textwrap import TextWrapper
 
 if not os.path.isdir('temp'):
     os.mkdir('temp')
@@ -40,6 +42,7 @@ from kivy.uix.spinner import Spinner
 from kivy.clock import Clock
 from kivy.graphics import Ellipse
 from kivy.uix.image import Image
+from kivy.base import stopTouchApp
 
 Builder.load_string('''
 <Label>:
@@ -58,27 +61,11 @@ Builder.load_string('''
     separator_height: 1
     title_font: "fonts/ionicons_semibold.ttf"
 
-<ChatTopBar>:
-    ChatTopButton:
-        text: " Settings"
-        size_hint: 0.5, 1
-    ChatTopButton:
-        text: " Help"
-        size_hint: 0.4, 1
-        on_release: app.show_help(self)
-    ChatTopButton:
-        disabled: True
-    ChatTopButton:
-        text: " Log out"
-        size_hint: 0.5, 1
-        on_release: app.logout_dialog.open()
-
-<ChatTopButton@Button>:
-    background_normal: 'textures/button/menu_bt_normal.png'
-    background_down: 'textures/button/inputbt_down.png'
-    background_disabled_normal: 'textures/button/menu_bt_normal.png'
-    font_size: 13
-    font_name: 'fonts/ionicons_semibold.ttf'
+<ClockLabel>:
+    text_size: self.size
+    valign: 'bottom'
+    color: 0.23, 0.23, 0.23, 1
+    font_size: 8
 
 <DateSpinner>:
     sync_height: True
@@ -87,6 +74,15 @@ Builder.load_string('''
     background_down: 'textures/button/down.png'
     background_disabled_normal: 'textures/button/disabled.png'
     disabled_color: 1, 1, 1, 1
+
+<DialogButton>:
+    background_normal: 'textures/button/menu_bt_normal.png'
+    background_down: 'textures/button/inputbt_down.png'
+    background_disabled_normal: 'textures/button/menu_bt_normal.png'
+    text_size: self.width - 10, self.height
+    valign: 'center'
+    font_size: 14
+    font_name: 'fonts/ionicons_semibold.ttf'
 
 <ErrorLabel>:
     text_size: self.size
@@ -107,7 +103,10 @@ Builder.load_string('''
             size: self.width - 2, self.height - 2
 
 <FullSizeButton>:
-    text_size: self.width - 20, self.height
+    text_size: self.width - self.bound[0], self.height - self.bound[1]
+
+<FullSizeLabel>:
+    text_size: self.width - self.bound[0], self.height - self.bound[1]
 
 <HelpBar>:
     MenuButton:
@@ -155,32 +154,32 @@ Builder.load_string('''
         size: 47, 47
         pos: 114, 214
 
-<InfoView>:
-    orientation: "vertical"
-    Label:
-        id: sent_text
-        markup: True
-        halign: "left"
-        text: root.sent_text
-        text_size: self.size
-        size_hint: 1, 0.4
-        font_size: 15
-        color: 1, 1, 1, 1
+#<InfoView>:
+    #orientation: "vertical"
+    #Label:
+        #id: sent_text
+        #markup: True
+        #halign: "left"
+        #text: root.sent_text
+        #text_size: self.size
+        #size_hint: 1, 0.4
+        #font_size: 15
+        #color: 1, 1, 1, 1
 
-    Label:
-        id: msg
-        text: "Message text:"
-        font_name: "fonts/OpenSans-Semibold.ttf"
-        size_hint: 1, 0.15
-        font_size: 13
-        color: 1, 1, 1, 1
+    #Label:
+        #id: msg
+        #text: "Message text:"
+        #font_name: "fonts/OpenSans-Semibold.ttf"
+        #size_hint: 1, 0.15
+        #font_size: 13
+        #color: 1, 1, 1, 1
 
-    TextInput:
-        id: msg_text
-        readonly: True
-        cursor_color: 0, 0, 0, 0
-        background_normal: "textures/textinput/msginput_unfocused.png"
-        background_active: "textures/textinput/msginput_unfocused.png"
+    #TextInput:
+        #id: msg_text
+        #readonly: True
+        #cursor_color: 0, 0, 0, 0
+        #background_normal: "textures/textinput/msginput_unfocused.png"
+        #background_active: "textures/textinput/msginput_unfocused.png"
 
 <InputBox>:
     canvas:
@@ -241,13 +240,8 @@ Builder.load_string('''
         markup: True
         font_name: 'fonts/ionicons_semibold.ttf'
         font_size: 17
-        background_normal: 'textures/button/add_bt_normal.png'
+        background_normal: 'textures/button/menu_bt_normal.png'
         background_down: 'textures/button/inputbt_down.png'
-
-#<MenuButton>:
-    #font_size: 16
-    #font_name: 'fonts/ionicons_semibold.ttf'
-    #size_hint: 1, 0.1
 
 <MenuButton>:
     size_hint: 1, 0.09
@@ -272,31 +266,17 @@ Builder.load_string('''
             points: self.x + self.width, self.y, self.x + self.width, self.y + self.height
 
 <Message>:
-    width: 500
-    BoxLayout:
-        pos: root.pos
-        height: self.height
-        canvas:
-            Color:
-                rgba: 0.8, 0.8, 0.8, 1
-            RoundedRectangle:
-                pos: root.pos
-                size: self.size
-            Color:
-                rgba: root.bg_color
-            RoundedRectangle:
-                pos: root.x + 1, root.y + 1
-                size: self.width - 2, self.height - 2
-
-        TextInput:
-            id: msg
+    canvas:
+        Color:
+            rgba: 0.8, 0.8, 0.8, 1
+        RoundedRectangle:
             pos: root.pos
-            size: root.size
-            font_name: "fonts/ionicons_regular.ttf"
-            font_size: 13
-            background_color: 0, 0, 0, 0
-            readonly: True
-            cursor_color: 0, 0, 0, 0
+            size: self.size
+        Color:
+            rgba: root.bg_color
+        RoundedRectangle:
+            pos: root.x + 1, root.y + 1
+            size: self.width - 2, self.height - 2
 
 <MessageInput>:
     background_normal: 'textures/textinput/msginput_unfocused.png'
@@ -334,7 +314,7 @@ Builder.load_string('''
 
 <NickLabel>:
     background_color: 0, 0, 0, 0
-    color: [1, 1, 1, 1] if self.state is 'normal' else [0.16, 0.36, 0.56, 1]
+    color: [0, 0, 0, 1] if self.state is 'normal' else [0.16, 0.36, 0.56, 1]
     size_hint_x: None
     width: self.texture_size[0]
     font_size: 13
@@ -603,21 +583,65 @@ class SmileButton(Button):
         self.color = (1, 1, 1, 1)
 
 
-class Message(Widget):
-    bg_color = ListProperty([0.99, 0.99, 0.99, 1])
-    real_text = StringProperty()
-    def __init__(self, sender, time, **kwargs):
-        self.sender = sender
-        self.time = time
+class ClockLabel(Label):
+    def __init__(self, tm, **kwargs):
         super().__init__(**kwargs)
+        self.text = datetime.fromtimestamp(tm // 100).strftime("%H:%M")
+
+
+class Message(BoxLayout):
+    bg_color = ListProperty([0.99, 0.99, 0.99, 1])
+    tw = TextWrapper(width = 20)
+    sent = ('Sender: [color=#B6DAFF]{}[/color]'
+            '\nTime: [color=#C8C8C8]{}[/color]')
+
+    def width_modify(self):
+        min_width = 160
+        max_width = 320
+        max_line = max(self.text_box._lines_labels,
+                       key = lambda x: x.width).width
+        curr_width = max_line + 15
+        if curr_width < min_width:
+            return min_width
+        elif curr_width > max_width:
+            return max_width
+        else:
+            return curr_width
+
+    def line_wrap(self, text):
+        spl = re.split('(\n{2,})', text)
+        res = ''
+        for idx, part in enumerate(spl):
+            res += part if idx % 2 else self.tw.fill(part)
+        return res
+
+    def __init__(self, text, tm, sender, scr, **kwargs):
+        super().__init__(**kwargs)
+        self.text_box = TextInput(font_name = "fonts/OpenSans-Regular.ttf",
+                                  font_size = 13,
+                                  background_color = (0, 0, 0, 0),
+                                  readonly = True,
+                                  cursor_color = (0, 0, 0, 0))
+
+        self.real_text = text
+        self.text_box.text = self.line_wrap(text)
+        self.sender = sender
+        self.time = tm
+        self.scr = scr
+
+        self.height = (self.text_box.text.count('\n') + 2) * 19
+        self.add_widget(self.text_box)
+
+        if sender != app.nick:
+            self.bg_color = [0.91, 0.95, 1, 1]
 
     def on_touch_down(self, touch):
         if self.collide_point(*touch.pos):
-            sent = "Sender: [color=#B6DAFF]{}[/color]\nTime: [color=#C8C8C8]{}[/color]".format(self.sender, self.time.strftime("%H:%M:%S"))
-            info_view = app.info_view
-            info_popup = app.info_popup
-            info_view.ids['sent_text'].text = sent
-            info_view.ids['msg_text'].text = self.ids['msg'].real_text
+            info_popup = self.scr.info_popup
+            sent_text = self.sent.format(self.sender,
+                                         datetime.fromtimestamp(self.time // 100).strftime("%H:%M:%S"))
+            info_popup.info_view.info_lb.text = sent_text
+            info_popup.info_view.msg_text.text = self.real_text
             info_popup.open()
 
 
@@ -688,8 +712,33 @@ class NickLabel(Button):
 
 class InfoView(BoxLayout):
     def __init__(self, **kwargs):
-        self.sent_text = ''
         super().__init__(**kwargs)
+        self.orientation = 'vertical'
+
+        self.info_lb = FullSizeLabel(markup = True,
+                                       halign = 'left',
+                                       bound = [0, 0],
+                                       size_hint = (1, 0.4),
+                                       font_size = 15,
+                                       color = (1, 1, 1, 1))
+
+        self.msg_label = Label(text = "Message text:",
+                               font_name = "fonts/OpenSans-Semibold.ttf",
+                               size_hint = (1, 0.15),
+                               font_size = 13,
+                               color = (1, 1, 1, 1))
+
+        self.msg_text = TextInput(readonly = True,
+                                  cursor_color = (0, 0, 0, 0),
+                                  background_normal = "textures/textinput/"
+                                                      "msginput_unfocused.png",
+                                  background_active = "textures/textinput/"
+                                                      "msginput_unfocused.png")
+
+        self.add_widget(self.info_lb)
+        self.add_widget(self.msg_label)
+        self.add_widget(self.msg_text)
+
 
 
 class ChatTopBar(BoxLayout):
@@ -756,8 +805,7 @@ class PersonProfile(Profile):
 
 
 class SelfProfile(Profile):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    pass
 
 
 class MessageInput(TextInput):
@@ -842,7 +890,7 @@ class RegScreen(Screen):
                                     font_name = "fonts/ionicons_regular.ttf",
                                     text = " Login",
                                     on_release = app.to_login,
-                                    background_normal = 'textures/button/add_bt_normal.png')
+                                    background_normal = 'textures/button/menu_bt_normal.png')
 
         self.lb_usr = Label(size_hint = (0.28, 0.03),
                             pos_hint = {"top": 0.75, "right": 0.255},
@@ -928,8 +976,8 @@ class ErrorDisp(Popup):
                         halign = "left",
                         valign = "top")
 
-        cont.add_widget(self.lb)
-        cont.add_widget(self.btn)
+        self.cont.add_widget(self.lb)
+        self.cont.add_widget(self.btn)
         super().__init__(title = 'Error',
                          content = self.cont,
                          height = 180,
@@ -967,7 +1015,11 @@ class UsernameButton(Button):
 
 
 class FullSizeButton(Button):
-    pass
+    bound = ListProperty([0, 0])
+
+
+class FullSizeLabel(Label):
+    bound = ListProperty([0, 0])
 
 
 class YesNoDialog(Popup):
@@ -1027,7 +1079,7 @@ class QuitDialog(YesNoDialog):
 
     def ch_yes(self, bt):
         self.dismiss()
-        Clock.schedule_once(app.stop, 0.15)
+        stopTouchApp()
 
     def ch_no(self, bt):
         self.dismiss()
@@ -1199,13 +1251,15 @@ class UserRecord(BoxLayout):
         self.name = UsernameButton(text = name,
                                    size_hint = (0.79, 1),
                                    background_color = (0, 0, 0, 0),
-                                   color = (0, 0, 0, 1))
+                                   color = (0, 0, 0, 1),
+                                   on_press = app.to_dialog)
         self.opts = DropDown()
 
         self.more = FullSizeButton(text = '',
                                    halign = 'right',
                                    font_name = 'fonts/ionicons_regular.ttf',
                                    font_size = 25,
+                                   bound = [20, 0],
                                    color = (0, 0, 0, 1),
                                    size_hint = (0.13, 1),
                                    background_color = (0, 0, 0, 0),
@@ -1373,7 +1427,7 @@ class LoginScreen(Screen):
                                        text = "[size=18][/size] Register",
                                        markup = True,
                                        on_release = app.to_register,
-                                       background_normal = 'textures/button/add_bt_normal.png')
+                                       background_normal = 'textures/button/menu_bt_normal.png')
 
         self.lb_usr = Label(size_hint = (0.28, 0.03),
                             pos_hint = {"top": 0.67, "right": 0.255},
@@ -1438,6 +1492,7 @@ class SearchInput(MessageInput):
             self.text = text[:15]
         inst.cont.update_result(text)
 
+
 class AddPersonPopup(Popup):
     def update_result(self, query):
         self.users_disp.clear_widgets()
@@ -1500,6 +1555,248 @@ class AddPersonPopup(Popup):
         self.disp_scroll.add_widget(self.users_disp)
 
 
+class MsgInfoPopup(Popup):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self.info_view = InfoView()
+
+        self.height = 250
+        self.content = self.info_view
+        self.title = "Message Info"
+
+
+class DialogScreen(Screen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self.msg_stack = []
+        self.smiles = [':)', ':D', ':]', ':3', '=)', ':D',
+                       'xD', '=D', '>:(', ':-(', ':(', ':c',
+                       ':<', ':[', ':{', ':\'(', ':\'-)',':P',
+                       ':\')', '>:O', ':o', 'O_O', 'O_o', 'XP',
+                       ':*', ';-)', ';)', ';-]', ';]', ';D',
+                       ':-p', ':p', ':-Þ', ':Þ', ':þ', ':-b',
+                       ':b', '>:/', ':-.', ':/', '=/', '>:P',
+                       ':L', '>.<', '-_-', ':|', 'O:-)', '0:3',
+                       '0:)', '>:)', '>;)', '>:-)', '%)', '<:-|',
+                       '</3', '<3', '^_^', '^^', '(._.)', '/(._. )']
+
+        self.main_box = BoxLayout(orientation = "vertical")
+
+        self.button_bar = DialogButtonBar(size_hint = (1, 0.06))
+        self.status_bar = DialogStatusBar(size_hint = (1, 0.06))
+
+        self.msg_layout = MessageView(size_hint = (1, 0.66),
+                                      bar_inactive_color = (0, 0, 0, 0),
+                                      do_scroll_x = False,
+                                      bar_margin = 3,)
+
+        self.msg_grid = GridLayout(cols = 1,
+                                   padding = 10,
+                                   spacing = 10,
+                                   size_hint_y = None)
+        self.msg_grid.bind(minimum_height = self.msg_grid.setter('height'))
+        # For modifying the height when new widgets are added
+
+        self.input_bar = DialogInputBar(size_hint = (1, 0.2))
+
+        self.smile_bbl = SmileBubble()
+        grid = self.smile_bbl.ids['smile_grid']
+        for smile in self.smiles:
+            grid.add_widget(SmileButton(text=smile,
+                                        on_release = self.input_bar.add_smile,
+                                        background_normal = '',
+                                        background_down = '',
+                                        background_color = (0, 0, 0, 0),
+                                        font_size = 13,
+                                        always_release = True,
+                                        font_name = "fonts/OpenSans-Semibold.ttf"))
+
+        self.info_popup = MsgInfoPopup()
+
+        self.add_widget(self.main_box)
+        self.main_box.add_widget(self.button_bar)
+        self.main_box.add_widget(self.status_bar)
+        self.main_box.add_widget(self.msg_layout)
+        self.main_box.add_widget(self.input_bar)
+
+        self.msg_layout.add_widget(self.msg_grid)
+
+
+class DialogButton(Button):
+    pass
+
+
+class DialogOptButton(Button):
+    def __init__(self, sym, text, space, **kwargs):
+        super().__init__(**kwargs)
+        self.size_hint_y = None
+        self.font_size = 13
+        self.background_normal = 'textures/button/drop_opt.png'
+        self.background_down = 'textures/button/drop_opt_down.png'
+        self.font_name = 'fonts/ionicons_regular.ttf'
+        self.height = 25
+        self.markup = True
+        self.text = '[size=18]' + sym + '[/size] ' + \
+                    ' ' * space + text + ' ' * space
+
+
+class DialogButtonBar(BoxLayout):
+    def drop_open(self, bt):
+        self.opts_drop.open(self.opts_extender)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.menu = DialogButton(text = ' Menu',
+                                 halign = 'left',
+                                 size_hint = (0.19, 1),
+                                 on_release = app.to_menu)
+        self.opts_drop = DropDown()
+        self.opts_extender = BoxLayout(size_hint = (0.46, 1))
+        self.opts = DialogButton(text = 'Options ',
+                                 halign = 'right',
+                                 on_release = self.drop_open)
+        self.plc = Button(background_disabled_normal =
+                          'textures/button/menu_bt_normal.png',
+                          disabled = True,
+                          size_hint = (0.35, 1))
+        self.opts_plc = Button(background_disabled_normal =
+                               'textures/button/menu_bt_normal.png',
+                               disabled = True)
+
+        self.search_bt = DialogOptButton('', 'Search for messages', 1)
+        self.delete_bt = DialogOptButton('', 'Delete dialog', 9)
+        self.opts_drop.add_widget(self.search_bt)
+        self.opts_drop.add_widget(self.delete_bt)
+
+        self.opts_extender.add_widget(self.opts_plc)
+        self.opts_extender.add_widget(self.opts)
+
+        self.add_widget(self.menu)
+        self.add_widget(self.plc)
+        self.add_widget(self.opts_extender)
+
+
+class DialogStatusBar(BoxLayout):
+    def view_profile(self, bt):
+        app.to_profile(self.name.text)
+
+    def update_names(self, bt):
+        self.nick = app.login_scr.tx_usr.text
+        if not self.nick:
+            self.nick = app.register_scr.tx_usr.text
+        self.self_name.text = self.nick
+
+        self.name.text = app.person
+        self.status.online = bt.parent.status.online
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+
+        self.self_name = NickLabel(halign = "right",
+                                   on_release = app.to_self_profile)
+        self.self_status = Status(size_hint = (0.1, 1))
+
+        self.name = NickLabel(halign = "left",
+                              on_release = app.to_profile)
+        self.status = Status(size_hint = (0.1, 1))
+
+        self.add_widget(self.self_status)
+        self.add_widget(self.self_name)
+        self.add_widget(Widget())
+        self.add_widget(self.name)
+        self.add_widget(self.status)
+
+
+class MessageRow(BoxLayout):
+    def __init__(self, text, tm, sender, scr, **kwargs):
+        super().__init__(**kwargs)
+        self.scr = scr
+
+        self.msg = Message(text, tm, sender, scr,
+                           size_hint = (0.7, 1))
+        self.tm = ClockLabel(tm,
+                             size_hint = (0.1, 1))
+
+        self.height = self.msg.height
+        self.size_hint = [1, None]
+
+        if sender != app.nick:
+            self.add_widget(Widget(size_hint = (0.2, 1)))
+            self.add_widget(self.tm)
+            self.add_widget(self.msg)
+        else:
+            self.add_widget(self.msg)
+            self.add_widget(self.tm)
+            self.add_widget(Widget(size_hint = (0.2, 1)))
+
+
+class DialogInputBar(BoxLayout):
+    def smile_show(self, bt):
+        if self.scr is None:
+            self.scr = self.parent.parent
+        if self.scr.smile_bbl.hidden:
+            self.scr.add_widget(self.scr.smile_bbl)
+            self.scr.smile_bbl.hidden = False
+        else:
+            self.scr.remove_widget(self.scr.smile_bbl)
+            self.scr.smile_bbl.hidden = True
+
+    def send_msg(self, bt):
+        text = self.msg_input.text.strip('\n ')
+        self.msg_input.text = ''
+        if text not in string.whitespace:
+            self.msg_in(text, app.nick)
+            self.auto_response(text.upper())
+
+    def auto_response(self, text):
+        self.msg_in(text, app.person)
+
+    def msg_in(self, text, nick):
+        curr_time = int(time.time() * 100)
+        if self.scr is None:
+            self.scr = self.parent.parent
+        msg_row = MessageRow(text, curr_time, escape_markup(nick), self.scr)
+
+        self.scr.msg_grid.add_widget(msg_row)
+        self.scr.msg_layout.scroll_to(msg_row)
+
+    def add_smile(self, bt):
+        self.msg_input.text += ' ' + bt.text + ' '
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.btn_panel = BoxLayout(orientation = "vertical",
+                           size_hint = (0.1, 1))
+
+        self.input_panel = InputBox(size_hint = (0.9, 1))
+
+        self.msg_input = MessageInput('Your message here...',
+                                      font_size = 13)
+
+        self.bt_send = InputButton(size_hint = (1, 0.35),
+                                   text = "",
+                                   font_size = 20,
+                                   on_release = self.send_msg)
+
+        self.bt_smile = InputButton(size_hint = (1, 0.65),
+                                    text = "",
+                                    font_size = 22,
+                                    on_release = self.smile_show)
+
+        self.scr = None
+
+        self.add_widget(self.input_panel)
+        self.add_widget(self.btn_panel)
+
+        self.input_panel.add_widget(self.msg_input)
+
+        self.btn_panel.add_widget(self.bt_smile)
+        self.btn_panel.add_widget(self.bt_send)
+
+
 class ChatApp(App):
     nick_ptrn = re.compile('(?![ ]+)[\w ]{2,15}')
     invalid_nick = ('The username you entered is incorrect. '
@@ -1510,6 +1807,13 @@ class ChatApp(App):
                   'Try something different')
     wrong_pswd = ('You entered a wrong password for this username. '
                   'Try again')
+    users = [[('user1', True),
+              ('user7', False)],
+             [('user2', False)],
+             [('user3', True)],
+             [('user4', False)],
+             [('user5', True)],
+             [('user6', False)]]
 
     def to_login(self, bt = None):
         Window.size = (370, 200)
@@ -1547,6 +1851,14 @@ class ChatApp(App):
     def to_help(self, bt = None):
         pass
 
+    def to_dialog(self, bt):
+        Window.size = (350, 500)
+        name = bt.text
+        self.person = name
+        self.screens.get_screen(name).status_bar.update_names(bt)
+
+        self.screens.current = self.person
+
     def add_favs(self, bt = None):
         print('add_favs')
 
@@ -1581,13 +1893,9 @@ class ChatApp(App):
         print('send_request')
 
     def get_user_groups(self, bt = None):
-        self.menu_scr.build_usr_list([[('user1', True),
-                                       ('user7', False)],
-                                      [('user2', False)],
-                                      [('user3', True)],
-                                      [('user4', False)],
-                                      [('user5', True)],
-                                      [('user6', False)]])
+        self.menu_scr.build_usr_list(self.users)
+        for i in (name[0] for group in self.users for name in group):
+            self.screens.add_widget(DialogScreen(name = i))
 
     def register(self, bt = None):
         if not re.match(self.nick_ptrn,
@@ -1600,10 +1908,14 @@ class ChatApp(App):
             av = _Image.open('textures/panels/avatar_placeholder.png')
             av.save('temp/self_avatar.png', 'PNG')
             av.close()
+
             self.menu_scr.info_box.avatar.source = 'temp/self_avatar.png'
+
             self.nick = self.register_scr.tx_usr.text
             self.menu_scr.info_box.logged_as_lb.text = "Logged in as\n" + self.nick
+
             self.get_user_groups()
+
             self.to_menu()
 
     def login(self, bt = None):
@@ -1614,10 +1926,14 @@ class ChatApp(App):
             av = _Image.open('textures/panels/avatar_placeholder.png')
             av.save('temp/self_avatar.png', 'PNG')
             av.close()
+
             self.menu_scr.info_box.avatar.source = 'temp/self_avatar.png'
+
             self.nick = self.login_scr.tx_usr.text
             self.menu_scr.info_box.logged_as_lb.text = "Logged in as\n" + self.nick
+
             self.get_user_groups()
+
             self.to_menu()
 
     def logout(self, bt = None):
@@ -1631,21 +1947,6 @@ class ChatApp(App):
         'search_username'
         return [(query, True),
                 (query + '1', False)]
-
-    def width_modify(self, inst):
-        min_width = 160
-        max_width = 320
-        max_line = 0
-        for i in inst.ids['msg']._lines_labels:
-            if i.width > max_line:
-                max_line = i.width
-        curr_width = max_line + 15
-        if curr_width < min_width:
-            return min_width
-        elif curr_width > max_width:
-            return max_width
-        else:
-            return curr_width
 
     def _line_wrap(self, text):
         max_line_len = 22
@@ -1709,9 +2010,6 @@ class ChatApp(App):
         self.msg_grid.add_widget(msg)
         self.msg_layout.scroll_to(msg)
 
-    def drop_open(self, bt):
-        self.drop_picker.open(self.drop_mnt)
-
     def log_in(self, bt):
         self.nick = self.tx_usr.text
         self.my_name.text = self.nick
@@ -1724,69 +2022,21 @@ class ChatApp(App):
             self.screens.current = 'main'
             Window.size = (350, 500)
 
-    def smile_show(self, bt):
-        if self.smile_bbl.hidden:
-            self.chat.add_widget(self.smile_bbl)
-            self.smile_bbl.hidden = False
-        else:
-            self.chat.remove_widget(self.smile_bbl)
-            self.smile_bbl.hidden = True
-
-    def smile_in(self, bt):
-        self.msg_input.text += ' ' + bt.text + ' '
-
-    def log_out_next(self, bt):
-        self.screens.transition = self.no_trans
-        self.screens.current = 'intro'
-        Window.size = (400, 175)
-        self.nick = ''
-        self.passw = ''
-
-    def log_out_anim(self, bt):
-        self.logout_dialog.dismiss()
-        Clock.schedule_once(self.log_out_next, 0.1)
-
     def show_help(self, bt):
         self.slide_trans.direction = "down"
         self.screens.transition = self.slide_trans
         self.screens.current = 'help'
 
-    def hide_screen(self, bt, direct):
-        self.screens.transition.direction = direct
-        self.screens.current = 'main'
-
-    def show_profile(self, bt):
-        self.slide_trans.direction = "left"
-        self.screens.transition = self.slide_trans
-        who = 'my' if bt is self.my_name else 'person'
-        self.screens.current = who + '_profile'
-
-    def hide_profile(self, bt):
-        self.screens.transition.direction = "right"
-        self.screens.current = 'main'
-
     def on_stop(self):
-        if os.path.isdir('temp'):
-            for i in os.scandir('temp'):
-                os.remove(i.path)
-            os.rmdir('temp')
+        for i in os.scandir('temp'):
+            os.remove(i.path)
+        os.rmdir('temp')
 
     def build(self):
         Window.clearcolor = (0.71, 0.85, 1, 1)
         self.nick = ''
         self.person = ''
         self.msg_stack = []
-        self.smiles = [':)', ':D', ':]', ':3', '=)',
-                       ':D', 'xD', '=D', '>:(', ':-(', ':(',
-                       ':c', ':<', ':[', ':{', ':\'(',
-                       ':\'-)', ':\')', '>:O', ':o',
-                       'O_O', 'O_o', ':*', ';-)', ';)',
-                       ';-]', ';]', ';D', '>:P', ':P', 'XP',
-                       ':-p', ':p', ':-Þ', ':Þ', ':þ', ':-b',
-                       ':b', '>:/', ':-.', ':/', '=/',
-                       ':L', '>.<', '-_-', ':|', 'O:-)', '0:3',
-                       '0:)', '>:)', '>;)', '>:-)', '%)', '<:-|',
-                       '</3', '<3', '^_^', '^^', '(._.)', '/(._. )']
 
         self.people = ["UpperBot"]
 
@@ -1796,145 +2046,13 @@ class ChatApp(App):
 
         self.screens = ScreenManager(transition = self.no_trans)
 
-        #self.intro = Screen(name = "intro")
         self.register_scr = RegScreen(name = "register")
         self.login_scr = LoginScreen(name = "login")
         self.menu_scr = MenuScreen(name = "menu")
-        self.chat = Screen(name = "main")
+        #self.dialog_scr = DialogScreen(name = "dialog")
         self.help = Screen(name = "help")
         self.self_profile_scr = SelfProfile(name = "self_profile")
         self.profile_scr = PersonProfile(name = "profile")
-        #self.intro_box = BoxLayout()
-        #self.reg_box = RegisterLayout(size_hint = (0.7, 1))
-        #self.name_box = PersonLayout(size_hint = (0.3, 1))
-
-        #self.lb_reg = RegLabel(size_hint = (1, 0.17),
-                                #pos_hint = {"top": 1},
-                                #text = "Register")
-
-        #self.lb_usr = Label(size_hint = (0.28, 0.1),
-                            #pos_hint = {"top": 0.7, "right": 0.3},
-                            #text = "Username:",
-                            #color = (1, 1, 1, 1),
-                            #font_size = 16)
-
-        #self.tx_usr = NickInput(size_hint = (0.6, 0.19),
-                                #pos_hint = {"top": 0.755, "right": 0.95})
-
-        #self.lb_pass = Label(size_hint = (0.28, 0.1),
-                                #pos_hint = {"top": 0.45, "right": 0.3},
-                                #text = "Password:",
-                                #color = (1, 1, 1, 1),
-                                #font_size = 16)
-
-        #self.tx_pass = NickInput(size_hint = (0.6, 0.19),
-                                    #pos_hint = {"top": 0.495, "right": 0.95},
-                                    #password = True)
-
-        #self.bt_next = Button(size_hint = (0.5, 0.2),
-                                #pos_hint = {"top":0.19, "right":0.94},
-                                #text = "Next",
-                                #font_size = 16,
-                                #disabled = True,
-                                #background_normal = "textures/button/normal_intro.png",
-                                #background_down = "textures/button/down_intro.png",
-                                #background_disabled_normal = "textures/button/disabled_intro.png",
-                                #on_release = self.log_in)
-
-        #self.lb_who = RegLabel(size_hint = (1, 0.25),
-                                #pos_hint = {"top": 1, "right": 1},
-                                #font_size = 13,
-                                #text = "Who do you want\nto chat with?")
-
-        #self.drop_picker = ChatPicker(max_height = 1)
-
-        #for i in self.people:
-            #bt = Button(size_hint = (0.9, None),
-                            #height = 24,
-                            #text = i,
-                            #font_size = 11,
-                            #color = (0, 0, 0, 1),
-                            #background_normal = "textures/button/drop_opt.png",
-                            #background_down = "textures/button/drop_opt_down.png",
-                            #on_release = lambda bt: self.drop_picker.select(bt.text))
-            #self.drop_picker.add_widget(bt)
-
-        #self.drop_mnt = PickerHead(size_hint = (0.9, None),
-                                    #height = 24,
-                                    #pos_hint = {"top": 0.7, "right": 0.95})
-
-        #self.drop_mnt.ids['arrow'].bind(on_release = self.drop_open)
-
-        self.main_box = BoxLayout(orientation = "vertical")
-
-        self.top_bar = BoxLayout(size_hint = (1, 0.12),
-                                 orientation = "vertical")
-
-        self.menu_panel = ChatTopBar(size_hint = (1, None),
-                                     height = 30)
-
-        self.status_panel = BoxLayout()
-
-        self.my_name = NickLabel(halign = "right",
-                                 on_press = self.show_profile)
-
-        self.person_name = NickLabel(halign = "left",
-                                     on_press = self.show_profile)
-
-        self.status_place = Widget()
-
-        self.my_status = Status()
-
-        self.person_status = Status()
-
-        self.msg_layout = MessageView(size_hint = (1, 0.68),
-                                      bar_inactive_color = (0, 0, 0, 0),
-                                      do_scroll_x = False,
-                                      bar_margin = 3)
-
-        self.msg_grid = GridLayout(cols = 1,
-                                   padding = 10,
-                                   spacing = 10,
-                                   size_hint_y = None)
-        self.msg_grid.bind(minimum_height = self.msg_grid.setter('height'))
-        # For modifying the height when new widgets are added
-
-        self.input_bar = BoxLayout(size_hint = (1, 0.2))
-
-        self.btn_panel = BoxLayout(orientation = "vertical",
-                                   size_hint = (0.1, 1))
-
-        self.input_panel = InputBox(size_hint = (0.9, 1))
-
-        self.msg_input = MessageInput('Your message here...',
-                                      font_size = 13)
-
-        self.bt_send = InputButton(size_hint = (1, 0.35),
-                                   text = "",
-                                   font_size = 20,
-                                   on_release = self.send_msg)
-
-        self.bt_smile = InputButton(size_hint = (1, 0.65),
-                                    text = "",
-                                    font_size = 22,
-                                    on_release = self.smile_show)
-
-        self.smile_bbl = SmileBubble()
-        grid = self.smile_bbl.ids['smile_grid']
-        for smile in self.smiles:
-            grid.add_widget(SmileButton(text=smile,
-                                        on_release = self.smile_in,
-                                        background_normal = '',
-                                        background_down = '',
-                                        background_color = (0, 0, 0, 0),
-                                        font_size = 13,
-                                        font_name = "fonts/OpenSans-Semibold.ttf"))
-
-        self.info_view = InfoView()
-
-        self.info_popup = Popup(height = 250,
-                                content = self.info_view,
-                                title = "Message Info")
 
         self.help_box = BoxLayout(orientation = "vertical")
 
@@ -1942,84 +2060,18 @@ class ChatApp(App):
 
         self.help_text = HelpLabel()
 
-        #self.logout_view = BoxLayout(orientation = "vertical")
-
-        #self.logout_dialog = Popup(height = 150,
-                                   #title = " Log out",
-                                   #title_size = 16,
-                                   #content = self.logout_view)
-
-        #self.logout_ask = Label(size_hint = (1, 0.6),
-                                #text = "Do you want to log out?",
-                                #color = (1, 1, 1, 1),
-                                #font_name = "fonts/ionicons_semibold.ttf")
-
-        #self.logout_btns = BoxLayout(size_hint = (1, 0.4),
-                                     #spacing = 4,
-                                     #padding = 2)
-
-        #self.logout_yes = LogoutButton(text = " Yes",
-                                       #on_release = self.log_out_anim)
-
-        #self.logout_no = LogoutButton(text = " No",
-                                      #on_release = self.logout_dialog.dismiss)
-
         self.screens.add_widget(self.register_scr)
         self.screens.add_widget(self.login_scr)
         self.screens.add_widget(self.menu_scr)
-        self.screens.add_widget(self.chat)
+        #self.screens.add_widget(self.dialog_scr)
         self.screens.add_widget(self.help)
         self.screens.add_widget(self.self_profile_scr)
         self.screens.add_widget(self.profile_scr)
-
-        #self.intro.add_widget(self.intro_box)
-        #self.intro_box.add_widget(self.reg_box)
-        #self.intro_box.add_widget(self.name_box)
-
-        #self.reg_box.add_widget(self.lb_reg)
-        #self.reg_box.add_widget(self.lb_usr)
-        #self.reg_box.add_widget(self.tx_usr)
-        #self.reg_box.add_widget(self.lb_pass)
-        #self.reg_box.add_widget(self.tx_pass)
-        #self.reg_box.add_widget(self.bt_next)
-
-        #self.name_box.add_widget(self.lb_who)
-        #self.name_box.add_widget(self.drop_mnt)
-
-        self.chat.add_widget(self.main_box)
-        self.main_box.add_widget(self.top_bar)
-        self.main_box.add_widget(self.msg_layout)
-        self.main_box.add_widget(self.input_bar)
-
-        self.top_bar.add_widget(self.menu_panel)
-        self.top_bar.add_widget(self.status_panel)
-        self.msg_layout.add_widget(self.msg_grid)
-
-        self.status_panel.add_widget(self.person_status)
-        self.status_panel.add_widget(self.person_name)
-        self.status_panel.add_widget(self.status_place)
-        self.status_panel.add_widget(self.my_name)
-        self.status_panel.add_widget(self.my_status)
-
-        self.input_bar.add_widget(self.input_panel)
-        self.input_bar.add_widget(self.btn_panel)
-
-        self.input_panel.add_widget(self.msg_input)
-
-        self.btn_panel.add_widget(self.bt_smile)
-        self.btn_panel.add_widget(self.bt_send)
 
         self.help.add_widget(self.help_box)
 
         self.help_box.add_widget(self.help_bar)
         self.help_box.add_widget(self.help_text)
-
-        #self.logout_view.add_widget(self.logout_ask)
-        #self.logout_view.add_widget(self.logout_btns)
-
-        #self.logout_btns.add_widget(self.logout_yes)
-        #self.logout_btns.add_widget(self.logout_no)
-
         return self.screens
 
 
