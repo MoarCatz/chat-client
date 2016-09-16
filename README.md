@@ -1,5 +1,3 @@
-[![Build Status](https://travis-ci.org/MoarCatz/chat.svg?branch=master)](https://travis-ci.org/MoarCatz/chat)
-
 ## Chat
 
 This is a simple encrypted chat application with a desktop client.
