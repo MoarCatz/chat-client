@@ -38,7 +38,7 @@ from kivy.utils import escape_markup
 from kivy.uix.dropdown import DropDown
 from kivy.uix.settings import Settings
 from kivy.uix.togglebutton import ToggleButton
-from kivy.uix.spinner import Spinner
+from kivy.uix.spinner import Spinner, SpinnerOption
 from kivy.clock import Clock
 from kivy.graphics import Ellipse
 from kivy.uix.image import Image
@@ -70,10 +70,6 @@ Builder.load_string('''
 <DateSpinner>:
     sync_height: True
     text_autoupdate: True
-    background_normal: 'textures/button/normal.png'
-    background_down: 'textures/button/down.png'
-    background_disabled_normal: 'textures/button/disabled.png'
-    disabled_color: 1, 1, 1, 1
 
 <DialogButton>:
     background_normal: 'textures/button/menu_bt_normal.png'
@@ -826,28 +822,143 @@ class InputButton(Button):
     pass
 
 
+class DateSpinnerItem(SpinnerOption):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.font_size = 12
+        self.background_normal = 'textures/button/drop_opt.png'
+        self.background_down = 'textures/button/drop_opt_down.png'
+
+
 class DateSpinner(Spinner):
-    pass
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.option_cls = DateSpinnerItem
+        #self.background_normal = ''
+        self.background_normal = 'textures/button/inputbt_down.png'
+        self.background_color = (0, 0, 0, 0)
+
+    def on_is_open(self, inst, state):
+        super().on_is_open(inst, state)
+        inst.background_color = ((1, 1, 1, 1) if state else (0, 0, 0, 0))
+
+
+class DateTextField(TextInput):
+    def __init__(self, prev, **kwargs):
+        self.text_limit = len(prev)
+        super().__init__(**kwargs)
+        self.background_color = (0, 0, 0, 0)
+        self.font_size = 11
+        self.foreground_color = (1, 1, 1, 1)
+        self.cursor_color = (0, 0, 0, 1)
+        self.multiline = False
+        self.write_tab = False
+        self.prev = prev
+        self.text = prev
+
+    def on_focus(self, inst, state):
+        if state:
+            inst.prev = inst.text
+            inst.text = ''
+        self.background_color = (1, 1, 1, 1) if state else (0, 0, 0, 0)
+        self.foreground_color = (0, 0, 0, 1) if state else (1, 1, 1, 1)
+        if not state:
+            self.parent.update_date(self)
+
+    def on_text(self, inst, text):
+        if not text.isdigit():
+            inst.text = text[:-1]
+        if len(text) > self.text_limit:
+            inst.text = text[:self.text_limit]
+
+    def on_text_validate(self):
+        self.text = self.text.zfill(self.text_limit)
+
+
+class DatePickerDelim(Label):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.size_hint = (0.01, 1)
+        self.color = (1, 1, 1, 1)
+        self.font_size = 13
 
 
 class DatePicker(BoxLayout):
+    month_match = {'January':   1,
+                   'February':  2,
+                   'March':     3,
+                   'April':     4,
+                   'May':       5,
+                   'June':      6,
+                   'July':      7,
+                   'August':    8,
+                   'September': 9,
+                   'October':  10,
+                   'November': 11,
+                   'December': 12}
+
+    def update_date(self, inst, tx = None):
+        try:
+            ts = datetime(int(self.year.text),
+                          self.month_match[self.month.text],
+                          int(self.day.text))
+            self.timestamp = ts.timestamp()
+        except (ValueError, OverflowError):
+            inst.text = inst.default
+            ErrorDisp("You've entered an invalid date. Try again").open()
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.timestamp = 0
         curr_year = datetime.now().year
-        self.day = DateSpinner(size_hint = (0.2, 1),
-                               values = map(str, range(1, 32)))
+
+        self.year = DateTextField(size_hint = (0.3, 1),
+                                  prev = '1970')
 
         self.month = DateSpinner(size_hint = (0.5, 1),
+                                 font_size = 12,
                                  values = ('January', 'February', 'March', 'April',
                                            'May', 'June', 'July', 'August', 'September',
                                            'October', 'November', 'December'))
 
-        self.year = DateSpinner(size_hint = (0.3, 1),
-                                values = map(str, range(1970, curr_year + 1)))
+        self.day = DateTextField(size_hint = (0.2, 1),
+                                 prev = '01')
+
+        self.month.bind(text = self.update_date)
 
         self.add_widget(self.day)
         self.add_widget(self.month)
         self.add_widget(self.year)
+
+
+class ExtendedDatePicker(DatePicker):
+    def update_date(self, inst = None, text = None):
+            try:
+                ts = datetime(int(self.year.text),
+                              self.month_match[self.month.text],
+                              int(self.day.text),
+                              hour = int(self.hour.text),
+                              minute = int(self.minute.text),
+                              second = int(self.second.text))
+                self.timestamp = ts.timestamp()
+            except (ValueError, OverflowError):
+                inst.text = inst.prev
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.hour = DateTextField(size_hint = (0.2, 1),
+                                  prev = '00')
+        self.minute = DateTextField(size_hint = (0.2, 1),
+                                    prev = '00')
+        self.second = DateTextField(size_hint = (0.2, 1),
+                                    prev = '00')
+
+        self.add_widget(DatePickerDelim())
+        self.add_widget(self.hour)
+        self.add_widget(DatePickerDelim(text=':'))
+        self.add_widget(self.minute)
+        self.add_widget(DatePickerDelim(text=':'))
+        self.add_widget(self.second)
 
 
 class HelpLabel(Label):
@@ -1584,7 +1695,8 @@ class DialogScreen(Screen):
 
         self.main_box = BoxLayout(orientation = "vertical")
 
-        self.button_bar = DialogButtonBar(size_hint = (1, 0.06))
+        self.button_bar = DialogButtonBar(self,
+                                          size_hint = (1, 0.06))
         self.status_bar = DialogStatusBar(size_hint = (1, 0.06))
 
         self.msg_layout = MessageView(size_hint = (1, 0.66),
@@ -1646,8 +1758,13 @@ class DialogButtonBar(BoxLayout):
     def drop_open(self, bt):
         self.opts_drop.open(self.opts_extender)
 
-    def __init__(self, **kwargs):
+    def search_msg(self, bt):
+        self.opts_drop.dismiss()
+        SearchMsgPopup(self.scr).open()
+
+    def __init__(self, scr, **kwargs):
         super().__init__(**kwargs)
+        self.scr = scr
         self.menu = DialogButton(text = ' Menu',
                                  halign = 'left',
                                  size_hint = (0.19, 1),
@@ -1665,8 +1782,10 @@ class DialogButtonBar(BoxLayout):
                                'textures/button/menu_bt_normal.png',
                                disabled = True)
 
-        self.search_bt = DialogOptButton('', 'Search for messages', 1)
-        self.delete_bt = DialogOptButton('', 'Delete dialog', 9)
+        self.search_bt = DialogOptButton('', 'Search for messages', 1,
+                                         on_release = self.search_msg)
+        self.delete_bt = DialogOptButton('', 'Delete dialog', 9,
+                                         on_release = app.delete_dialog)
         self.opts_drop.add_widget(self.search_bt)
         self.opts_drop.add_widget(self.delete_bt)
 
@@ -1676,6 +1795,92 @@ class DialogButtonBar(BoxLayout):
         self.add_widget(self.menu)
         self.add_widget(self.plc)
         self.add_widget(self.opts_extender)
+
+
+class SearchMsgButton(Button):
+    def on_release(self):
+        l_tm = self.cont.from_picker.timestamp
+        u_tm = self.cont.to_picker.timestamp
+        text = self.cont.text_to_search.text
+        if l_tm > u_tm:
+            ErrorDisp('The end time exceeds the beginning.').open()
+        else:
+            msgs = app.search_message(self.cont.scr, text, l_tm, u_tm)
+            self.cont.build_msgs(msgs)
+
+    def __init__(self, cont, **kwargs):
+        super().__init__(**kwargs)
+        self.cont = cont
+        self.font_name = 'fonts/ionicons_regular.ttf'
+        self.background_normal = 'textures/button/normal.png'
+        self.background_down = 'textures/button/down.png'
+
+
+class SearchMsgPopup(Popup):
+    def build_msgs(self, msg_list):
+        self.msg_grid.clear_widgets()
+        for text, curr_time, nick in msg_list:
+            msg_row = MessageRow(text,
+                                 curr_time,
+                                 escape_markup(nick),
+                                 self.scr)
+
+            self.msg_grid.add_widget(msg_row)
+
+    def __init__(self, scr, **kwargs):
+        super().__init__(**kwargs)
+        self.title = "Search messages"
+        self.size = (300, 400)
+        self.scr = scr
+
+        self.container = BoxLayout(orientation = "vertical",
+                                   padding = 10,
+                                   spacing = 10)
+        self.from_box = BoxLayout(size_hint = (1, 0.1))
+        self.to_box = BoxLayout(size_hint = (1, 0.1))
+
+        self.from_lb = Label(text = "From: ",
+                             size_hint = (0.2, 1),
+                             color = (1, 1, 1, 1))
+        self.to_lb = Label(text = "To: ",
+                           size_hint = (0.2, 1),
+                           color = (1, 1, 1, 1))
+        self.from_picker = ExtendedDatePicker()
+        self.to_picker = ExtendedDatePicker()
+
+        self.from_box.add_widget(self.from_lb)
+        self.from_box.add_widget(self.from_picker)
+        self.to_box.add_widget(self.to_lb)
+        self.to_box.add_widget(self.to_picker)
+
+        self.src_button = SearchMsgButton(self,
+                                          text = " Search",
+                                          size_hint = (1, 0.1))
+
+        self.text_to_search = MessageInput("Text to search...",
+                                           size_hint = (1, 0.3),
+                                           font_size = 13)
+
+        self.msg_layout = MessageView(size_hint = (1, 0.5),
+                                      bar_inactive_color = (0, 0, 0, 0),
+                                      do_scroll_x = False,
+                                      bar_margin = 3,)
+
+        self.msg_grid = GridLayout(cols = 1,
+                                   padding = 10,
+                                   spacing = 10,
+                                   size_hint_y = None)
+        self.msg_grid.bind(minimum_height = self.msg_grid.setter('height'))
+
+        self.msg_layout.add_widget(self.msg_grid)
+
+        self.container.add_widget(self.from_box)
+        self.container.add_widget(self.to_box)
+        self.container.add_widget(self.text_to_search)
+        self.container.add_widget(self.src_button)
+        self.container.add_widget(self.msg_layout)
+
+        self.content = self.container
 
 
 class DialogStatusBar(BoxLayout):
@@ -1897,6 +2102,9 @@ class ChatApp(App):
         for i in (name[0] for group in self.users for name in group):
             self.screens.add_widget(DialogScreen(name = i))
 
+    def delete_dialog(self, bt = None):
+        pass
+
     def register(self, bt = None):
         if not re.match(self.nick_ptrn,
                         self.register_scr.tx_usr.text):
@@ -1947,6 +2155,10 @@ class ChatApp(App):
         'search_username'
         return [(query, True),
                 (query + '1', False)]
+
+    def search_message(self, screen, text, l_tm, u_tm):
+        return ((text + 'lol', (u_tm - l_tm) // 2, screen.name),
+                (text + 'kek', (u_tm - l_tm) // 2, self.nick))
 
     def _line_wrap(self, text):
         max_line_len = 22
