@@ -353,68 +353,6 @@ Builder.load_string('''
             font_name: 'fonts/ionicons_semibold.ttf'
             font_size: 16
 
-<Profile>:
-    BoxLayout:
-        orientation: "vertical"
-        ProfileBar:
-            size_hint: 1, 0.064
-        ProfilePage:
-            ProfileImage:
-                id: avatar
-                pos: 10, 360
-                size: 100, 100
-            ProfileField:
-                id: nick
-                pos: 120, 430
-                font_size: 15
-            ProfileLabel:
-                pos: 120, 410
-                text: "Status:"
-            ProfileField:
-                id: status
-                pos: 120, 360
-                height: 45
-            ProfileLabel:
-                pos: 10, 325
-                text: "[size=18][/size] Email:"
-            ProfileField:
-                id: email
-                pos: 120, 320
-            ProfileLabel:
-                pos: 10, 285
-                text: "[size=18][/size] Birthday:"
-            DatePicker:
-                id: bday
-                pos: 120, 280
-                size_hint: None, None
-                size: 220, 30
-                disabled: not self.parent.editing
-            ProfileLabel:
-                pos: 10, 245
-                text: "[size=18][/size] About:"
-            ProfileField:
-                id: about
-                pos: 120, 115
-                height: 150
-            EditButton:
-                id: edit
-                text: " Edit"
-                pos: 20, 10
-            ProfileButton:
-                id: delete
-                text: " Delete"
-                pos: 185, 10
-                on_press: pass
-
-<ProfileBar>:
-    MenuButton:
-        text: " Back"
-        size_hint: 0.17, 1
-        on_release: app.to_menu()
-    MenuButton:
-        disabled: True
-        size_hint: 1, 1
-
 <ProfileButton>:
     background_normal: 'textures/button/normal.png'
     background_down: 'textures/button/down.png'
@@ -422,41 +360,6 @@ Builder.load_string('''
     font_name: 'fonts/ionicons_semibold.ttf'
     size: 145, 40
     size_hint: None, None
-
-<ProfileField>:
-    size_hint: None, None
-    size: 220, 30
-    background_normal: "textures/textinput/msginput_unfocused.png"
-    cursor_color: [0, 0, 0, 1] if self.parent.editing else [0, 0, 0, 0]
-    background_color: [1, 1, 1, 1] if self.parent.editing else [0, 0, 0, 0]
-    selection_color: [0.1843, 0.6549, 0.8313, 0.5] if self.parent.editing else [0, 0, 0, 0]
-    readonly: not self.parent.editing
-    font_size: 13
-
-<ProfileImage@BoxLayout>:
-    padding: 3
-    size_hint: None, None
-    canvas.before:
-        Color:
-            rgba: 0.85, 0.92, 1, 1
-        Rectangle:
-            size: root.size
-            pos: root.pos
-        Color:
-            rgba: 0.16, 0.36, 0.56, 1
-        Rectangle:
-            size: root.width - 2, root.height - 2
-            pos: root.x + 1, root.y + 1
-    Image:
-        id: src
-
-<ProfileLabel@Label>:
-    size_hint: None, None
-    size: 80, 20
-    text_size: self.size
-    halign: "left"
-    font_size: 12
-    markup: True
 
 <RecordDivider>:
     height: 15
@@ -569,6 +472,14 @@ Builder.load_string('''
     background_disabled_normal: 'textures/button/disabled.png'
     font_name: 'fonts/ionicons_semibold.ttf'
 ''')
+
+
+class FullSizeButton(Button):
+    bound = ListProperty([0, 0])
+
+
+class FullSizeLabel(Label):
+    bound = ListProperty([0, 0])
 
 
 class SmileButton(Button):
@@ -712,11 +623,11 @@ class InfoView(BoxLayout):
         self.orientation = 'vertical'
 
         self.info_lb = FullSizeLabel(markup = True,
-                                       halign = 'left',
-                                       bound = [0, 0],
-                                       size_hint = (1, 0.4),
-                                       font_size = 15,
-                                       color = (1, 1, 1, 1))
+                                     halign = 'left',
+                                     bound = [0, 0],
+                                     size_hint = (1, 0.4),
+                                     font_size = 15,
+                                     color = (1, 1, 1, 1))
 
         self.msg_label = Label(text = "Message text:",
                                font_name = "fonts/OpenSans-Semibold.ttf",
@@ -746,19 +657,65 @@ class HelpBar(BoxLayout):
 
 
 class ProfileBar(BoxLayout):
-    pass
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.back_bt = Button(text = " Back",
+                              size_hint = (0.17, 1),
+                              font_name = 'fonts/ionicons_regular.ttf')
+        self.back_bt.bind(on_release = app.back_action)
+        self.plc = Button(disabled = True,
+                          size_hint = (1, 1))
+        self.add_widget(self.back_bt)
+        self.add_widget(self.plc)
 
 
 class Profile(Screen):
-    pass
+    def set_up_for(self, name):
+        page = self.page
+        profile_data = app.profiles[name]
+        page.nick_field.readonly = False
+        page.nick_field.text = profile_data.nick
+        page.status_field.text = profile_data.status
+        page.email_field.text = profile_data.email
+        page.birthday_field.update_selectors(profile_data.bday)
+        page.about_field.text = profile_data.about
+        page.avatar.source = profile_data.image_name
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.container = BoxLayout(orientation = "vertical")
+        self.profile_bar = ProfileBar(size_hint = (1, 0.064))
+        self.page = ProfilePage()
+
+        self.add_widget(self.container)
+        self.container.add_widget(self.profile_bar)
+        self.container.add_widget(self.page)
 
 
 class ProfileField(TextInput):
-    pass
+    def __init__(self, scr, **kwargs):
+        super().__init__(**kwargs)
+        self.size_hint = None, None
+        self.size = 220, 30
+        self.background_normal = "textures/textinput/msginput_unfocused.png"
+        self.cursor_color = [0, 0, 0, 0]
+        self.background_color = [0, 0, 0, 0]
+        self.selection_color = [0, 0, 0, 0]
+        self.readonly = not scr.editing
+        self.font_size = 13
+        self.multiline = False
 
 
 class ProfileButton(Button):
     pass
+
+
+class ProfileLabel(FullSizeLabel):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.size_hint = (None, None)
+        self.markup = True
+        self.font_name = 'fonts/ionicons_regular.ttf'
 
 
 class YesNoButton(Button):
@@ -766,38 +723,85 @@ class YesNoButton(Button):
 
 
 class EditButton(ToggleButton, ProfileButton):
-    def nick_sync(self):
-        app = app
-        new = app.my_profile.ids['nick'].text
-        if app.nick != new:
-            app.my_name.text = new
-            for i in app.msg_stack:
-                if i.sender == app.nick:
-                    i.sender = new
-            app.nick = new
-
-    def on_state(self, bt, state):
-        if state == 'down':
-            self.parent.editing = not self.parent.editing
-        else:
-            self.nick_sync()
-            self.parent.editing = not self.parent.editing
+    pass
 
 
 class ProfilePage(FloatLayout):
-    editing = BooleanProperty(False)
+    editing = False
     def edit(self, bt):
-        editing = not editing
+        if not self.editing:
+            for field in self.fields:
+                field.cursor_color = [0, 0, 0, 1]
+                field.background_color = [1, 1, 1, 1]
+                field.selection_color = [0.18, 0.65, 0.83, 0.5]
+                field.readonly = False
+            self.birthday_field.disabled = False
+        else:
+            for field in self.fields:
+                field.cursor_color = [0, 0, 0, 0]
+                field.background_color = [0, 0, 0, 0]
+                field.selection_color = [0, 0, 0, 0]
+                field.readonly = True
+            self.birthday_field.disabled = True
+        self.editing = not self.editing
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        with self.canvas:
+            self.avatar = Ellipse(pos = (10, 360),
+                                  size = (100, 100))
+        self.nick_field = ProfileField(self,
+                                       pos = (120, 430),
+                                       font_size = 15)
+        self.status_lb = ProfileLabel(pos = (120, 410),
+                                      size = (80, 20),
+                                      font_size = 12,
+                                      text = "Status:")
+        self.status_field = ProfileField(self,
+                                         pos = (120, 360),
+                                         height = 45)
+        self.email_lb = ProfileLabel(pos = (10, 325),
+                                     text = "[size=18][/size] Email:")
+        self.email_field = ProfileField(self,
+                                        pos = (120, 320))
+        self.birthday_lb = ProfileLabel(pos = (10, 285),
+                                        text = "[size=18][/size] Birthday:")
+        self.birthday_field = DatePicker(pos = (120, 280),
+                                         size_hint = (None, None),
+                                         size = (220, 30),
+                                         disabled = not self.editing)
+        self.about_lb = ProfileLabel(pos = (10, 245),
+                                     text = "[size=18][/size] About:")
+        self.about_field = ProfileField(self,
+                                        pos = (120, 115),
+                                        height = 250,
+                                        multiline = True)
+        self.edit_bt = EditButton(text = " Edit",
+                                  pos = (20, 10),
+                                  on_press = self.edit)
+        self.delete_bt = ProfileButton(text = " Delete",
+                                       pos = (185, 10),
+                                       on_press = print)
+
+        self.fields = [self.status_field,
+                       self.email_field,
+                       self.about_field]
+
+        self.add_widget(self.nick_field)
+        self.add_widget(self.status_lb)
+        self.add_widget(self.status_field)
+        self.add_widget(self.email_lb)
+        self.add_widget(self.email_field)
+        self.add_widget(self.birthday_lb)
+        self.add_widget(self.birthday_field)
+        self.add_widget(self.about_lb)
+        self.add_widget(self.about_field)
+        self.add_widget(self.edit_bt)
+        self.add_widget(self.delete_bt)
 
 
 class PersonProfile(Profile):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.ids['edit'].disabled = True
-        self.ids['delete'].disabled = True
-        self.ids['status'].text = "Making your messages uppercase since 2016"
-        self.ids['email'].text = "UNDEFINED"
-        self.ids['about'].text = "I'm just a bot"
+    pass
 
 
 class SelfProfile(Profile):
@@ -822,6 +826,13 @@ class InputButton(Button):
     pass
 
 
+class DateDropDown(DropDown):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.max_height = 240
+        self.effect_cls = ScrollEffect
+
+
 class DateSpinnerItem(SpinnerOption):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -834,7 +845,7 @@ class DateSpinner(Spinner):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.option_cls = DateSpinnerItem
-        #self.background_normal = ''
+        self.dropdown_cls = DateDropDown
         self.background_normal = 'textures/button/inputbt_down.png'
         self.background_color = (0, 0, 0, 0)
 
@@ -904,8 +915,16 @@ class DatePicker(BoxLayout):
                           int(self.day.text))
             self.timestamp = ts.timestamp()
         except (ValueError, OverflowError):
-            inst.text = inst.default
-            ErrorDisp("You've entered an invalid date. Try again").open()
+            inst.text = inst.prev
+
+    def update_selectors(self, tm):
+        self.timestamp = tm
+        date_obj = datetime.fromtimestamp(tm)
+        self.year.text = str(date_obj.year)
+        for month, num in self.month_match.items():
+            if num == date_obj.month:
+                self.month.text = month
+        self.day.text = str(date_obj.day)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -917,9 +936,10 @@ class DatePicker(BoxLayout):
 
         self.month = DateSpinner(size_hint = (0.5, 1),
                                  font_size = 12,
-                                 values = ('January', 'February', 'March', 'April',
-                                           'May', 'June', 'July', 'August', 'September',
-                                           'October', 'November', 'December'))
+                                 values = ('January', 'February', 'March',
+                                           'April', 'May', 'June', 'July',
+                                           'August', 'September', 'October',
+                                           'November', 'December'))
 
         self.day = DateTextField(size_hint = (0.2, 1),
                                  prev = '01')
@@ -1125,14 +1145,6 @@ class UsernameButton(Button):
     pass
 
 
-class FullSizeButton(Button):
-    bound = ListProperty([0, 0])
-
-
-class FullSizeLabel(Label):
-    bound = ListProperty([0, 0])
-
-
 class YesNoDialog(Popup):
     def ch_yes(self, bt):
         pass
@@ -1314,7 +1326,7 @@ class UserRecord(BoxLayout):
     def f_to_profile(self, bt):
         self.opts.dismiss()
         nick = bt.record.name.text
-        app.to_profile(nick)
+        app.to_profile(nick, 'menu')
 
     def f_remove_favs(self, bt):
         self.opts.dismiss()
@@ -1483,7 +1495,7 @@ class SearchRecord(UserRecord):
     def f_to_profile(self, bt):
         self.opts.dismiss()
         nick = bt.record.name.text
-        app.to_profile(nick, from_search = True)
+        app.to_profile(nick, 'search')
 
     def f_ask_msg(self, bt):
         self.opts.dismiss()
@@ -1885,7 +1897,7 @@ class SearchMsgPopup(Popup):
 
 class DialogStatusBar(BoxLayout):
     def view_profile(self, bt):
-        app.to_profile(self.name.text)
+        app.to_profile(self.name.text, app.person)
 
     def update_names(self, bt):
         self.nick = app.login_scr.tx_usr.text
@@ -1905,7 +1917,7 @@ class DialogStatusBar(BoxLayout):
         self.self_status = Status(size_hint = (0.1, 1))
 
         self.name = NickLabel(halign = "left",
-                              on_release = app.to_profile)
+                              on_release = self.view_profile)
         self.status = Status(size_hint = (0.1, 1))
 
         self.add_widget(self.self_status)
@@ -2002,6 +2014,16 @@ class DialogInputBar(BoxLayout):
         self.btn_panel.add_widget(self.bt_send)
 
 
+class ProfileData:
+    def __init__(self, nick, status, bday, email, about, image_name):
+        self.nick = nick
+        self.status = status
+        self.bday = bday
+        self.email = email
+        self.about = about
+        self.image_name = image_name
+
+
 class ChatApp(App):
     nick_ptrn = re.compile('(?![ ]+)[\w ]{2,15}')
     invalid_nick = ('The username you entered is incorrect. '
@@ -2019,6 +2041,17 @@ class ChatApp(App):
              [('user4', False)],
              [('user5', True)],
              [('user6', False)]]
+    profiles = {}
+
+    def back_to_search(self, bt = None):
+        self.screens.current = 'menu'
+        Window.size = (500, 450)
+        self.menu_scr.add_person_popup.open()
+
+    def back_to_screen(self, bt = None):
+        if self.return_scr == 'menu':
+            Window.size = (500, 450)
+        self.screens.current = self.return_scr
 
     def to_login(self, bt = None):
         Window.size = (370, 200)
@@ -2031,8 +2064,17 @@ class ChatApp(App):
         self.screens.current = 'register'
 
     def to_self_profile(self, bt = None):
+        self.back_action = self.back_to_screen
+        if isinstance(bt, MenuButton):
+            self.return_scr = 'menu'
+        else:
+            self.return_scr = app.person
+
+        self.profile_scr.profile_bar.back_bt.on_release = self.back_action
+
         Window.size = (350, 500)
         self.screens.transition = self.no_trans
+        self.profile_scr.set_up_for(self.nick)
         self.screens.current = 'self_profile'
 
     def to_menu(self, bt = None):
@@ -2040,14 +2082,22 @@ class ChatApp(App):
         self.screens.transition = self.no_trans
         self.screens.current = 'menu'
 
-    def to_profile(self, nick, from_search = False):
-        if from_search:
+    def to_profile(self, nick, return_scr):
+        self.get_profile_info(nick)
+        if return_scr == 'search':
+            self.back_action = self.back_to_search
             p = self.menu_scr.add_person_popup
             p.keep_text = True
             p.dismiss()
             p.keep_text = False
+        else:
+            self.back_action = self.back_to_screen
+            self.return_scr = return_scr
+
+        self.profile_scr.profile_bar.back_bt.on_release = self.back_action
 
         Window.size = (350, 500)
+        self.profile_scr.set_up_for(nick)
         self.screens.current = 'profile'
 
     def to_settings(self, bt = None):
@@ -2109,46 +2159,53 @@ class ChatApp(App):
         if not re.match(self.nick_ptrn,
                         self.register_scr.tx_usr.text):
             ErrorDisp(self.invalid_nick).open()
+            return
         elif not 'username_free':
             ErrorDisp(self.nick_taken).open()
-        else:
-            'register'
-            av = _Image.open('textures/panels/avatar_placeholder.png')
-            av.save('temp/self_avatar.png', 'PNG')
-            av.close()
+            return
 
-            self.menu_scr.info_box.avatar.source = 'temp/self_avatar.png'
+        'register'
+        self.nick = self.register_scr.tx_usr.text
+        self.menu_scr.info_box.logged_as_lb.text = "Logged in as\n" + self.nick
 
-            self.nick = self.register_scr.tx_usr.text
-            self.menu_scr.info_box.logged_as_lb.text = "Logged in as\n" + self.nick
+        self.get_profile_info(self.nick)
+        av = _Image.open('textures/panels/avatar_placeholder.png')
+        av.save('temp/self_avatar.png', 'PNG')
+        av.close()
 
-            self.get_user_groups()
+        self.menu_scr.info_box.avatar.source = 'temp/self_avatar.png'
 
-            self.to_menu()
+        self.get_user_groups()
+
+        self.to_menu()
 
     def login(self, bt = None):
         if not 'password_correct':
             ErrorDisp(self.wrong_pswd).open()
-        else:
-            'login'
-            av = _Image.open('textures/panels/avatar_placeholder.png')
-            av.save('temp/self_avatar.png', 'PNG')
-            av.close()
+            return
+        'login'
+        self.nick = self.login_scr.tx_usr.text
+        self.menu_scr.info_box.logged_as_lb.text = "Logged in as\n" + self.nick
 
-            self.menu_scr.info_box.avatar.source = 'temp/self_avatar.png'
+        self.get_profile_info(self.nick)
+        av = _Image.open(self.profiles[self.nick].image_name)
+        av.save('temp/self_avatar.png', 'PNG')
+        av.close()
 
-            self.nick = self.login_scr.tx_usr.text
-            self.menu_scr.info_box.logged_as_lb.text = "Logged in as\n" + self.nick
+        self.menu_scr.info_box.avatar.source = 'temp/self_avatar.png'
 
-            self.get_user_groups()
+        self.get_user_groups()
 
-            self.to_menu()
+        self.to_menu()
 
     def logout(self, bt = None):
         self.login_scr.tx_usr.text = ''
         self.login_scr.tx_pass.text = ''
         self.register_scr.tx_usr.text = ''
         self.register_scr.tx_pass.text = ''
+        for i in (name[0] for group in self.users for name in group):
+            scr = self.screens.get_screen(i)
+            self.screens.remove_widget(scr)
         self.to_login()
 
     def search_username(self, query):
@@ -2157,8 +2214,15 @@ class ChatApp(App):
                 (query + '1', False)]
 
     def search_message(self, screen, text, l_tm, u_tm):
+        'search_message'
         return ((text + 'lol', (u_tm - l_tm) // 2, screen.name),
                 (text + 'kek', (u_tm - l_tm) // 2, self.nick))
+
+    def get_profile_info(self, nick):
+        'get_profile_info'
+        prof = ProfileData(nick, '', 150, 'undefined', '',
+                           'textures/panels/avatar_placeholder.png')
+        self.profiles[nick] = prof
 
     def _line_wrap(self, text):
         max_line_len = 22
@@ -2250,6 +2314,9 @@ class ChatApp(App):
         self.person = ''
         self.msg_stack = []
 
+        self.return_scr = 'menu'
+        self.back_action = self.back_to_screen
+
         self.people = ["UpperBot"]
 
         self.no_trans = NoTransition()
@@ -2261,7 +2328,6 @@ class ChatApp(App):
         self.register_scr = RegScreen(name = "register")
         self.login_scr = LoginScreen(name = "login")
         self.menu_scr = MenuScreen(name = "menu")
-        #self.dialog_scr = DialogScreen(name = "dialog")
         self.help = Screen(name = "help")
         self.self_profile_scr = SelfProfile(name = "self_profile")
         self.profile_scr = PersonProfile(name = "profile")
@@ -2275,7 +2341,6 @@ class ChatApp(App):
         self.screens.add_widget(self.register_scr)
         self.screens.add_widget(self.login_scr)
         self.screens.add_widget(self.menu_scr)
-        #self.screens.add_widget(self.dialog_scr)
         self.screens.add_widget(self.help)
         self.screens.add_widget(self.self_profile_scr)
         self.screens.add_widget(self.profile_scr)
