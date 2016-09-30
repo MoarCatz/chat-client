@@ -673,7 +673,6 @@ class Profile(Screen):
     def set_up_for(self, name):
         page = self.page
         profile_data = app.profiles[name]
-        page.nick_field.readonly = False
         page.nick_field.text = profile_data.nick
         page.status_field.text = profile_data.status
         page.email_field.text = profile_data.email
@@ -806,7 +805,6 @@ class PersonProfile(Profile):
 
 class SelfProfile(Profile):
     pass
-
 
 class MessageInput(TextInput):
     def __init__(self, plch, **kwargs):
@@ -2074,7 +2072,7 @@ class ChatApp(App):
 
         Window.size = (350, 500)
         self.screens.transition = self.no_trans
-        self.profile_scr.set_up_for(self.nick)
+        self.self_profile_scr.set_up_for(self.nick)
         self.screens.current = 'self_profile'
 
     def to_menu(self, bt = None):
@@ -2329,8 +2327,8 @@ class ChatApp(App):
         self.login_scr = LoginScreen(name = "login")
         self.menu_scr = MenuScreen(name = "menu")
         self.help = Screen(name = "help")
-        self.self_profile_scr = SelfProfile(name = "self_profile")
-        self.profile_scr = PersonProfile(name = "profile")
+        self.self_profile_scr = Profile(name = "self_profile")
+        self.profile_scr = Profile(name = "profile")
 
         self.help_box = BoxLayout(orientation = "vertical")
 
