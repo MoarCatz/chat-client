@@ -40,7 +40,7 @@ from kivy.uix.settings import Settings
 from kivy.uix.togglebutton import ToggleButton
 from kivy.uix.spinner import Spinner, SpinnerOption
 from kivy.clock import Clock
-from kivy.graphics import Ellipse
+from kivy.graphics import Ellipse, Color, Rectangle
 from kivy.uix.image import Image
 from kivy.base import stopTouchApp
 
@@ -137,45 +137,6 @@ Builder.load_string('''
     text_size: self.size
     halign: "left"
     valign: "top"
-    Image:
-        source: 'textures/icons/python.png'
-        size: 40, 40
-        pos: 165, 285
-    Image:
-        source: 'textures/icons/kivy.png'
-        size: 30, 30
-        pos: 70, 265
-    Image:
-        source: 'textures/icons/ionic.png'
-        size: 47, 47
-        pos: 114, 214
-
-#<InfoView>:
-    #orientation: "vertical"
-    #Label:
-        #id: sent_text
-        #markup: True
-        #halign: "left"
-        #text: root.sent_text
-        #text_size: self.size
-        #size_hint: 1, 0.4
-        #font_size: 15
-        #color: 1, 1, 1, 1
-
-    #Label:
-        #id: msg
-        #text: "Message text:"
-        #font_name: "fonts/OpenSans-Semibold.ttf"
-        #size_hint: 1, 0.15
-        #font_size: 13
-        #color: 1, 1, 1, 1
-
-    #TextInput:
-        #id: msg_text
-        #readonly: True
-        #cursor_color: 0, 0, 0, 0
-        #background_normal: "textures/textinput/msginput_unfocused.png"
-        #background_active: "textures/textinput/msginput_unfocused.png"
 
 <InputBox>:
     canvas:
@@ -305,8 +266,8 @@ Builder.load_string('''
     font_name: "fonts/OpenSans-Regular.ttf"
     cursor_color: 0, 0, 0, 1
     write_tab: False
-    background_normal: "textures/textinput/nickinput_unfocused.png"
-    background_active: "textures/textinput/nickinput_focused.png"
+    background_normal: "textures/textinput/field.png"
+    background_active: "textures/textinput/field_active.png"
 
 <NickLabel>:
     background_color: 0, 0, 0, 0
@@ -693,20 +654,26 @@ class Profile(Screen):
 
 class ProfileField(TextInput):
     def __init__(self, scr, **kwargs):
-        super().__init__(**kwargs)
-        self.size_hint = None, None
-        self.size = 220, 30
-        self.background_normal = "textures/textinput/msginput_unfocused.png"
-        self.cursor_color = [0, 0, 0, 0]
-        self.background_color = [0, 0, 0, 0]
-        self.selection_color = [0, 0, 0, 0]
-        self.readonly = not scr.editing
-        self.font_size = 13
         self.multiline = False
+        self.font_size = 13
+        super().__init__(**kwargs)
+        self.size = 220, kwargs.get('height', 30)
+        self.size_hint = None, None
+        self.background_normal = "textures/textinput/field.png"
+        self.background_disabled_normal = "textures/textinput/field.png"
+        self.background_active = "textures/textinput/field_active.png"
+        self.cursor_color = [0, 0, 0, 1]
+        #self.background_color = [0, 0, 0, 0]
+        self.selection_color = [0.18, 0.65, 0.83, 0.5]
+        self.disabled_foreground_color = [0, 0, 0, 1]
+        self.disabled = not scr.editing
 
 
 class ProfileButton(Button):
-    pass
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.disabled = False
+        self.markup = True
 
 
 class ProfileLabel(FullSizeLabel):
@@ -714,7 +681,8 @@ class ProfileLabel(FullSizeLabel):
         super().__init__(**kwargs)
         self.size_hint = (None, None)
         self.markup = True
-        self.font_name = 'fonts/ionicons_regular.ttf'
+        self.font_name = kwargs.get('font_name', 'fonts/ionicons_regular.ttf')
+        font_size = 15
 
 
 class YesNoButton(Button):
@@ -728,62 +696,101 @@ class EditButton(ToggleButton, ProfileButton):
 class ProfilePage(FloatLayout):
     editing = False
     def edit(self, bt):
-        if not self.editing:
-            for field in self.fields:
-                field.cursor_color = [0, 0, 0, 1]
-                field.background_color = [1, 1, 1, 1]
-                field.selection_color = [0.18, 0.65, 0.83, 0.5]
-                field.readonly = False
-            self.birthday_field.disabled = False
+        for field in self.fields:
+            field.disabled = self.editing
+        if self.editing:
+            profile_data = app.profiles[self.nick_field.text]
+            status = self.status_field.text
+            if profile_data.status != status:
+                app.change_profile_section('status', status)
+                profile_data.status = status
+
+            email = self.email_field.text
+            if profile_data.email != email:
+                app.change_profile_section('email', email)
+                profile_data.email = email
+
+            bday = self.birthday_field.timestamp
+            if profile_data.bday != bday:
+                app.change_profile_section('birthday', bday)
+                profile_data.bday = bday
+
+            about = self.about_field.text
+            if profile_data.about != about:
+                app.change_profile_section('about', about)
+                profile_data.about = about
+
+            self.birthday_field.month.color = (0, 0, 0, 1)
         else:
-            for field in self.fields:
-                field.cursor_color = [0, 0, 0, 0]
-                field.background_color = [0, 0, 0, 0]
-                field.selection_color = [0, 0, 0, 0]
-                field.readonly = True
-            self.birthday_field.disabled = True
+            self.birthday_field.month.color = (1, 1, 1, 1)
         self.editing = not self.editing
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         with self.canvas:
+            Color(rgba = (0.4, 0.4, 0.4, 1))
+            Ellipse(pos = (9, 359),
+                    size = (102, 102))
+
+            Color(rgba = (1, 1, 1, 1))
             self.avatar = Ellipse(pos = (10, 360),
                                   size = (100, 100))
+
         self.nick_field = ProfileField(self,
+                                       font_name = 'fonts/OpenSans-Regular.ttf',
                                        pos = (120, 430),
-                                       font_size = 15)
+                                       font_size = 15,
+                                       background_color = [0, 0, 0, 0],
+                                       height = 35)
+
         self.status_lb = ProfileLabel(pos = (120, 410),
-                                      size = (80, 20),
+                                      size = (40, 12),
                                       font_size = 12,
                                       text = "Status:")
         self.status_field = ProfileField(self,
-                                         pos = (120, 360),
-                                         height = 45)
+                                         pos = (120, 375))
+
         self.email_lb = ProfileLabel(pos = (10, 325),
-                                     text = "[size=18][/size] Email:")
+                                     height = 20,
+                                     text = "[size=18][/size]       Email:")
         self.email_field = ProfileField(self,
                                         pos = (120, 320))
+
         self.birthday_lb = ProfileLabel(pos = (10, 285),
-                                        text = "[size=18][/size] Birthday:")
+                                        height = 20,
+                                        text = "[size=18][/size]  Birthday:")
         self.birthday_field = DatePicker(pos = (120, 280),
                                          size_hint = (None, None),
                                          size = (220, 30),
                                          disabled = not self.editing)
-        self.about_lb = ProfileLabel(pos = (10, 245),
-                                     text = "[size=18][/size] About:")
+        self.birthday_field.year.font_size = 15
+        self.birthday_field.day.font_size = 15
+        self.birthday_field.month.font_size = 15
+        self.birthday_field.year.size_hint_x = 0.25
+        self.birthday_field.day.size_hint_x = 0.15
+        self.birthday_field.month.size_hint_x = 0.4
+        self.birthday_field.month.color = 0, 0, 0, 1
+        self.birthday_field.add_widget(Widget(size_hint_x = 0.2))
+
+        self.about_lb = ProfileLabel(pos = (10, 243),
+                                     height = 20,
+                                     text = "[size=18][/size]      About:")
         self.about_field = ProfileField(self,
                                         pos = (120, 115),
-                                        height = 250,
+                                        height = 155,
                                         multiline = True)
-        self.edit_bt = EditButton(text = " Edit",
+
+        self.edit_bt = EditButton(text = "[size=18][/size] Edit",
                                   pos = (20, 10),
                                   on_press = self.edit)
-        self.delete_bt = ProfileButton(text = " Delete",
+
+        self.delete_bt = ProfileButton(text = "[size=20][/size] Delete",
                                        pos = (185, 10),
                                        on_press = print)
 
         self.fields = [self.status_field,
                        self.email_field,
+                       self.birthday_field,
                        self.about_field]
 
         self.add_widget(self.nick_field)
@@ -799,12 +806,12 @@ class ProfilePage(FloatLayout):
         self.add_widget(self.delete_bt)
 
 
-class PersonProfile(Profile):
-    pass
-
-
 class SelfProfile(Profile):
-    pass
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.page.delete_bt.disabled = True
+        self.page.edit_bt.disabled = True
+
 
 class MessageInput(TextInput):
     def __init__(self, plch, **kwargs):
@@ -859,11 +866,14 @@ class DateTextField(TextInput):
         self.background_color = (0, 0, 0, 0)
         self.font_size = 11
         self.foreground_color = (1, 1, 1, 1)
+        self.disabled_foreground_color = (0, 0, 0, 1)
         self.cursor_color = (0, 0, 0, 1)
         self.multiline = False
         self.write_tab = False
         self.prev = prev
         self.text = prev
+        self.background_normal = 'textures/textinput/field.png'
+        self.background_active = 'textures/textinput/field_active.png'
 
     def on_focus(self, inst, state):
         if state:
@@ -929,7 +939,7 @@ class DatePicker(BoxLayout):
         self.timestamp = 0
         curr_year = datetime.now().year
 
-        self.year = DateTextField(size_hint = (0.3, 1),
+        self.year = DateTextField(size_hint = (0.29, 1),
                                   prev = '1970')
 
         self.month = DateSpinner(size_hint = (0.5, 1),
@@ -944,6 +954,7 @@ class DatePicker(BoxLayout):
 
         self.month.bind(text = self.update_date)
 
+        self.add_widget(DatePickerDelim())
         self.add_widget(self.day)
         self.add_widget(self.month)
         self.add_widget(self.year)
@@ -1754,14 +1765,14 @@ class DialogOptButton(Button):
     def __init__(self, sym, text, space, **kwargs):
         super().__init__(**kwargs)
         self.size_hint_y = None
-        self.font_size = 13
+        self.font_size = 12
         self.background_normal = 'textures/button/drop_opt.png'
         self.background_down = 'textures/button/drop_opt_down.png'
-        self.font_name = 'fonts/ionicons_regular.ttf'
-        self.height = 25
+        self.font_name = 'fonts/ionicons_semibold.ttf'
+        self.height = 21
         self.markup = True
-        self.text = '[size=18]' + sym + '[/size] ' + \
-                    ' ' * space + text + ' ' * space
+        self.text = ('[size=18]' + sym + '[/size] ' +
+                     ' ' * space + text + ' ' * space)
 
 
 class DialogButtonBar(BoxLayout):
@@ -2222,33 +2233,8 @@ class ChatApp(App):
                            'textures/panels/avatar_placeholder.png')
         self.profiles[nick] = prof
 
-    def _line_wrap(self, text):
-        max_line_len = 22
-        if len(text) < max_line_len:
-            return text
-        dist_right = text[max_line_len:].find(' ')
-        ind_left = text[:max_line_len].rfind(' ')
-        dist_left = max_line_len - ind_left
-        ind_right = dist_right + max_line_len
-        if dist_right is -1:
-            if ind_left is -1:
-                return text[:max_line_len].strip() + '\n' + self._line_wrap(text[max_line_len:].strip())
-            return text[:ind_left].strip() + '\n' + self._line_wrap(text[ind_left+1:].strip())
-        if ind_left is -1 or dist_left > dist_right:
-            lb = Label(text = text[:ind_right])
-            lb._label.refresh()
-            if lb._label.texture.size[0] < 308:
-                return text[:ind_right].strip() + '\n' + self._line_wrap(text[ind_right+1:].strip())
-            return text[:max_line_len].strip() + '\n' + self._line_wrap(text[max_line_len:].strip())
-        return text[:ind_left].strip() + '\n' + self._line_wrap(text[ind_left+1:].strip())
-
-    def line_wrap(self, text):
-        lb = Label(text = text)
-        lb._label.refresh()
-        text_width = lb._label.texture.size[0]
-        if text_width > 230:
-            return self._line_wrap(text).rstrip()
-        return text
+    def change_profile_section(self, sect, chg):
+        'change_profile_section'
 
     def send_msg(self, bt):
         text = self.msg_input.text.strip('\n ')
@@ -2328,7 +2314,7 @@ class ChatApp(App):
         self.menu_scr = MenuScreen(name = "menu")
         self.help = Screen(name = "help")
         self.self_profile_scr = Profile(name = "self_profile")
-        self.profile_scr = Profile(name = "profile")
+        self.profile_scr = SelfProfile(name = "profile")
 
         self.help_box = BoxLayout(orientation = "vertical")
 
