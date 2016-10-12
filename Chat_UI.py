@@ -46,7 +46,7 @@ from kivy.base import stopTouchApp
 
 Builder.load_string('''
 <Label>:
-    font_name: "fonts/OpenSans-Regular.ttf"
+    font_name: "fonts/NotoSans_R.ttf"
     halign: "center"
     color: 0, 0, 0, 1
 
@@ -59,7 +59,7 @@ Builder.load_string('''
     pos_hint: {"center_x": 0.5, "center_y": 0.5}
     width: 250
     separator_height: 1
-    title_font: "fonts/ionicons_semibold.ttf"
+    title_font: "fonts/NotoSans_B.ttf"
 
 <ClockLabel>:
     text_size: self.size
@@ -78,7 +78,7 @@ Builder.load_string('''
     text_size: self.width - 10, self.height
     valign: 'center'
     font_size: 14
-    font_name: 'fonts/ionicons_semibold.ttf'
+    font_name: 'fonts/NotoSans_B.ttf'
 
 <ErrorLabel>:
     text_size: self.size
@@ -151,7 +151,7 @@ Builder.load_string('''
 <InputButton>:
     background_normal: 'textures/button/inputbt_normal.png'
     background_down: 'textures/button/inputbt_down.png'
-    font_name: 'fonts/ionicons_semibold.ttf'
+    font_name: 'fonts/NotoSans_B.ttf'
 
 <LoggedAsLabel>:
     text_size: self.width - 10, self.height
@@ -195,7 +195,7 @@ Builder.load_string('''
         text: "[size=20][/size] Add"
         size_hint: 0.3, 1
         markup: True
-        font_name: 'fonts/ionicons_semibold.ttf'
+        font_name: 'fonts/NotoSans_B.ttf'
         font_size: 17
         background_normal: 'textures/button/menu_bt_normal.png'
         background_down: 'textures/button/inputbt_down.png'
@@ -204,7 +204,7 @@ Builder.load_string('''
     size_hint: 1, 0.09
     background_normal: 'textures/button/topbt_normal.png'
     background_down: 'textures/button/inputbt_down.png'
-    font_name: 'fonts/ionicons_regular.ttf'
+    font_name: 'fonts/NotoSans_R.ttf'
     font_size: 17
     markup: True
 
@@ -238,7 +238,7 @@ Builder.load_string('''
 <MessageInput>:
     background_normal: 'textures/textinput/msginput_unfocused.png'
     background_active: 'textures/textinput/msginput_focused.png'
-    font_name: "fonts/OpenSans-Regular.ttf"
+    font_name: "fonts/NotoSans_R.ttf"
     cursor_color: 0, 0, 0, 1
     write_tab: False
 
@@ -263,7 +263,7 @@ Builder.load_string('''
 <NickInput>:
     multiline: False
     font_size: 14
-    font_name: "fonts/OpenSans-Regular.ttf"
+    font_name: "fonts/NotoSans_R.ttf"
     cursor_color: 0, 0, 0, 1
     write_tab: False
     background_normal: "textures/textinput/field.png"
@@ -311,14 +311,14 @@ Builder.load_string('''
             background_normal: 'textures/button/arrow.png'
             background_down: 'textures/button/arrow_down.png'
             text: ""
-            font_name: 'fonts/ionicons_semibold.ttf'
+            font_name: 'fonts/NotoSans_B.ttf'
             font_size: 16
 
 <ProfileButton>:
     background_normal: 'textures/button/normal.png'
     background_down: 'textures/button/down.png'
     background_disabled_normal: 'textures/button/disabled.png'
-    font_name: 'fonts/ionicons_semibold.ttf'
+    font_name: 'fonts/NotoSans_B.ttf'
     size: 145, 40
     size_hint: None, None
 
@@ -343,7 +343,7 @@ Builder.load_string('''
 
 <RegLabel>:
     color: 1, 1, 1, 1
-    font_name: 'fonts/ionicons_semibold.ttf'
+    font_name: 'fonts/NotoSans_B.ttf'
     size_hint: 0.7, 1
     text_size: self.width - 20, self.height - 10
     halign: "left"
@@ -431,7 +431,7 @@ Builder.load_string('''
     background_normal: 'textures/button/normal.png'
     background_down: 'textures/button/down.png'
     background_disabled_normal: 'textures/button/disabled.png'
-    font_name: 'fonts/ionicons_semibold.ttf'
+    font_name: 'fonts/NotoSans_B.ttf'
 ''')
 
 
@@ -485,7 +485,7 @@ class Message(BoxLayout):
 
     def __init__(self, text, tm, sender, scr, **kwargs):
         super().__init__(**kwargs)
-        self.text_box = TextInput(font_name = "fonts/OpenSans-Regular.ttf",
+        self.text_box = TextInput(font_name = "fonts/NotoSans_R.ttf",
                                   font_size = 13,
                                   background_color = (0, 0, 0, 0),
                                   readonly = True,
@@ -591,7 +591,7 @@ class InfoView(BoxLayout):
                                      color = (1, 1, 1, 1))
 
         self.msg_label = Label(text = "Message text:",
-                               font_name = "fonts/OpenSans-Semibold.ttf",
+                               font_name = "fonts/NotoSans_B.ttf",
                                size_hint = (1, 0.15),
                                font_size = 13,
                                color = (1, 1, 1, 1))
@@ -622,7 +622,7 @@ class ProfileBar(BoxLayout):
         super().__init__(**kwargs)
         self.back_bt = Button(text = " Back",
                               size_hint = (0.17, 1),
-                              font_name = 'fonts/ionicons_regular.ttf')
+                              font_name = 'fonts/NotoSans_R.ttf')
         self.back_bt.bind(on_release = app.back_action)
         self.plc = Button(disabled = True,
                           size_hint = (1, 1))
@@ -681,7 +681,7 @@ class ProfileLabel(FullSizeLabel):
         super().__init__(**kwargs)
         self.size_hint = (None, None)
         self.markup = True
-        self.font_name = kwargs.get('font_name', 'fonts/ionicons_regular.ttf')
+        self.font_name = kwargs.get('font_name', 'fonts/NotoSans_R.ttf')
         font_size = 15
 
 
@@ -737,14 +737,14 @@ class ProfilePage(FloatLayout):
                                   size = (100, 100))
 
         self.nick_field = ProfileField(self,
-                                       font_name = 'fonts/OpenSans-Regular.ttf',
+                                       font_name = 'fonts/NotoSans_R.ttf',
                                        pos = (120, 430),
                                        font_size = 15,
                                        background_color = [0, 0, 0, 0],
                                        height = 35)
 
         self.status_lb = ProfileLabel(pos = (120, 410),
-                                      size = (40, 12),
+                                      size = (40, 15),
                                       font_size = 12,
                                       text = "Status:")
         self.status_field = ProfileField(self,
@@ -1021,13 +1021,13 @@ class RegScreen(Screen):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.top_box = RegisterLayout(size_hint = (1, 0.12),
+        self.top_box = RegisterLayout(size_hint = (1, 0.125),
                                       pos_hint = {"top": 1})
 
         self.lb_reg = RegLabel(text = "Register")
 
         self.to_login = InputButton(size_hint = (0.25, 1),
-                                    font_name = "fonts/ionicons_regular.ttf",
+                                    font_name = "fonts/NotoSans_R.ttf",
                                     text = " Login",
                                     on_release = app.to_login,
                                     background_normal = 'textures/button/menu_bt_normal.png')
@@ -1077,7 +1077,7 @@ class RegScreen(Screen):
         self.show_psw = ShowPswdButton(size_hint = (0.4, 0.15),
                                        pos_hint = {"top": 0.16, "right": 0.4},
                                        text = ' Show password',
-                                       font_name = "fonts/ionicons_regular.ttf",
+                                       font_name = "fonts/NotoSans_R.ttf",
                                        background_color = (0, 0, 0, 0))
 
         self.add_widget(self.top_box)
@@ -1163,14 +1163,14 @@ class YesNoDialog(Popup):
 
     def __init__(self, title, question):
         box = BoxLayout(orientation = "vertical")
-        self.height = 155
+        self.height = 160
         self.title = title
         self.title_size = 16
 
         question_lb = Label(size_hint = (1, 0.6),
                             text = question,
                             color = (1, 1, 1, 1),
-                            font_name = "fonts/ionicons_semibold.ttf")
+                            font_name = "fonts/NotoSans_B.ttf")
 
         answers = BoxLayout(size_hint = (1, 0.4),
                                  spacing = 4,
@@ -1389,8 +1389,8 @@ class UserRecord(BoxLayout):
 
         self.more = FullSizeButton(text = '',
                                    halign = 'right',
-                                   font_name = 'fonts/ionicons_regular.ttf',
-                                   font_size = 25,
+                                   font_name = 'fonts/NotoSans_R.ttf',
+                                   font_size = 21,
                                    bound = [20, 0],
                                    color = (0, 0, 0, 1),
                                    size_hint = (0.13, 1),
@@ -1549,13 +1549,13 @@ class LoginScreen(Screen):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.top_box = LoginLayout(size_hint = (1, 0.145),
+        self.top_box = LoginLayout(size_hint = (1, 0.15),
                                    pos_hint = {"top": 1})
 
         self.lb_log = RegLabel(text = "Login")
 
         self.to_register = InputButton(size_hint = (0.25, 1),
-                                       font_name = "fonts/ionicons_regular.ttf",
+                                       font_name = "fonts/NotoSans_R.ttf",
                                        text = "[size=18][/size] Register",
                                        markup = True,
                                        on_release = app.to_register,
@@ -1595,7 +1595,7 @@ class LoginScreen(Screen):
         self.show_psw = ShowPswdButton(size_hint = (0.4, 0.15),
                                        pos_hint = {"top": 0.16, "right": 0.4},
                                        text = ' Show password',
-                                       font_name = "fonts/ionicons_regular.ttf",
+                                       font_name = "fonts/NotoSans_R.ttf",
                                        background_color = (0, 0, 0, 0))
 
         self.add_widget(self.top_box)
@@ -1664,7 +1664,7 @@ class AddPersonPopup(Popup):
 
         self.msg_popup = Popup(height = 180,
                                title = 'Message (optional)',
-                               title_font = 'fonts/OpenSans-Regular.ttf')
+                               title_font = 'fonts/NotoSans_R.ttf')
         self.msg_cont = FloatLayout()
         self.msg_input = MessageInput('',
                                       size_hint = (0.98, 0.65),
@@ -1744,7 +1744,7 @@ class DialogScreen(Screen):
                                         background_color = (0, 0, 0, 0),
                                         font_size = 13,
                                         always_release = True,
-                                        font_name = "fonts/OpenSans-Semibold.ttf"))
+                                        font_name = "fonts/NotoSans_B.ttf"))
 
         self.info_popup = MsgInfoPopup()
 
@@ -1768,10 +1768,10 @@ class DialogOptButton(Button):
         self.font_size = 12
         self.background_normal = 'textures/button/drop_opt.png'
         self.background_down = 'textures/button/drop_opt_down.png'
-        self.font_name = 'fonts/ionicons_semibold.ttf'
-        self.height = 21
+        self.font_name = 'fonts/NotoSans_B.ttf'
+        self.height = 22
         self.markup = True
-        self.text = ('[size=18]' + sym + '[/size] ' +
+        self.text = ('[size=15]' + sym + '[/size] ' +
                      ' ' * space + text + ' ' * space)
 
 
@@ -1803,7 +1803,7 @@ class DialogButtonBar(BoxLayout):
                                'textures/button/menu_bt_normal.png',
                                disabled = True)
 
-        self.search_bt = DialogOptButton('', 'Search for messages', 1,
+        self.search_bt = DialogOptButton('', 'Search for messages', 2,
                                          on_release = self.search_msg)
         self.delete_bt = DialogOptButton('', 'Delete dialog', 9,
                                          on_release = app.delete_dialog)
@@ -1832,7 +1832,7 @@ class SearchMsgButton(Button):
     def __init__(self, cont, **kwargs):
         super().__init__(**kwargs)
         self.cont = cont
-        self.font_name = 'fonts/ionicons_regular.ttf'
+        self.font_name = 'fonts/NotoSans_R.ttf'
         self.background_normal = 'textures/button/normal.png'
         self.background_down = 'textures/button/down.png'
 
