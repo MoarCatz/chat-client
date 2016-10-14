@@ -67,14 +67,10 @@ Builder.load_string('''
     color: 0.23, 0.23, 0.23, 1
     font_size: 8
 
-<DateSpinner>:
-    sync_height: True
-    text_autoupdate: True
-
 <DialogButton>:
-    background_normal: 'textures/button/menu_bt_normal.png'
+    background_normal: 'textures/button/menubt_normal.png'
     background_down: 'textures/button/inputbt_down.png'
-    background_disabled_normal: 'textures/button/menu_bt_normal.png'
+    background_disabled_normal: 'textures/button/menubt_normal.png'
     text_size: self.width - 10, self.height
     valign: 'center'
     font_size: 14
@@ -112,7 +108,7 @@ Builder.load_string('''
         text: " Help"
         size_hint: 0.27, 1
         background_normal: 'textures/button/inputbt_down.png'
-        background_down: 'textures/button/menu_bt_normal.png'
+        background_down: 'textures/button/menubt_normal.png'
         on_press: app.hide_screen(self, 'up')
     MenuButton:
         disabled: True
@@ -197,7 +193,7 @@ Builder.load_string('''
         markup: True
         font_name: 'fonts/NotoSans_B.ttf'
         font_size: 17
-        background_normal: 'textures/button/menu_bt_normal.png'
+        background_normal: 'textures/button/menubt_normal.png'
         background_down: 'textures/button/inputbt_down.png'
 
 <MenuButton>:
@@ -292,27 +288,6 @@ Builder.load_string('''
                     self.x + self.width, self.y + self.height, \
                     self.x + self.width, self.y, self.x, self.y, \
                     self.x, self.y + self.height
-
-<PickerHead>:
-    BoxLayout:
-        size: root.size
-        pos: root.pos
-        Button:
-            id: name
-            size_hint: 0.8, 1
-            text: "Select"
-            color: 0, 0, 0, 1
-            font_size: 11
-            background_normal: "textures/button/picker_head.png"
-            background_down: "textures/button/picker_head.png"
-        Button:
-            id: arrow
-            size_hint: 0.2, 1
-            background_normal: 'textures/button/arrow.png'
-            background_down: 'textures/button/arrow_down.png'
-            text: ""
-            font_name: 'fonts/NotoSans_B.ttf'
-            font_size: 16
 
 <ProfileButton>:
     background_normal: 'textures/button/normal.png'
@@ -545,22 +520,6 @@ class LoginLayout(BoxLayout):
     pass
 
 
-class ChatPicker(DropDown):
-    def __init__(self, **kwargs):
-        self.selected = False
-        super().__init__(**kwargs)
-
-    def on_select(self, name):
-        app.drop_mnt.ids['name'].text = name
-        self.selected = True
-        app.check_next()
-
-
-class PickerHead(Widget):
-    def on_release(self):
-        app.drop_picker.open()
-
-
 class Status(BoxLayout):
     online = BooleanProperty(True)
     def __init__(self, online = True, **kwargs):
@@ -622,9 +581,15 @@ class ProfileBar(BoxLayout):
         super().__init__(**kwargs)
         self.back_bt = Button(text = " Back",
                               size_hint = (0.17, 1),
-                              font_name = 'fonts/NotoSans_R.ttf')
+                              font_name = 'fonts/NotoSans_R.ttf',
+                              background_normal = 'textures/button/'
+                                                  'menubt_normal.png',
+                              background_down = 'textures/button/'
+                                                'inputbt_down.png')
         self.back_bt.bind(on_release = app.back_action)
         self.plc = Button(disabled = True,
+                          background_disabled_normal = 'textures/button/'
+                                                       'menubt_normal.png',
                           size_hint = (1, 1))
         self.add_widget(self.back_bt)
         self.add_widget(self.plc)
@@ -698,6 +663,7 @@ class ProfilePage(FloatLayout):
     def edit(self, bt):
         for field in self.fields:
             field.disabled = self.editing
+        self.birthday_field.disabled = self.editing
         if self.editing:
             profile_data = app.profiles[self.nick_field.text]
             status = self.status_field.text
@@ -719,10 +685,6 @@ class ProfilePage(FloatLayout):
             if profile_data.about != about:
                 app.change_profile_section('about', about)
                 profile_data.about = about
-
-            self.birthday_field.month.color = (0, 0, 0, 1)
-        else:
-            self.birthday_field.month.color = (1, 1, 1, 1)
         self.editing = not self.editing
 
     def __init__(self, **kwargs):
@@ -760,17 +722,9 @@ class ProfilePage(FloatLayout):
                                         height = 20,
                                         text = "[size=18][/size]  Birthday:")
         self.birthday_field = DatePicker(pos = (120, 280),
-                                         size_hint = (None, None),
                                          size = (220, 30),
+                                         size_hint = (None, None),
                                          disabled = not self.editing)
-        self.birthday_field.year.font_size = 15
-        self.birthday_field.day.font_size = 15
-        self.birthday_field.month.font_size = 15
-        self.birthday_field.year.size_hint_x = 0.25
-        self.birthday_field.day.size_hint_x = 0.15
-        self.birthday_field.month.size_hint_x = 0.4
-        self.birthday_field.month.color = 0, 0, 0, 1
-        self.birthday_field.add_widget(Widget(size_hint_x = 0.2))
 
         self.about_lb = ProfileLabel(pos = (10, 243),
                                      height = 20,
@@ -790,7 +744,6 @@ class ProfilePage(FloatLayout):
 
         self.fields = [self.status_field,
                        self.email_field,
-                       self.birthday_field,
                        self.about_field]
 
         self.add_widget(self.nick_field)
@@ -831,56 +784,45 @@ class InputButton(Button):
     pass
 
 
-class DateDropDown(DropDown):
+class DateDropItem(SpinnerOption):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.max_height = 240
-        self.effect_cls = ScrollEffect
-
-
-class DateSpinnerItem(SpinnerOption):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.font_size = 12
-        self.background_normal = 'textures/button/drop_opt.png'
+        self.font_size = 14
+        self.height = 30
+        self.background_normal = 'textures/button/drop_opt_white.png'
         self.background_down = 'textures/button/drop_opt_down.png'
+        self.color = (0, 0, 0, 1)
 
 
-class DateSpinner(Spinner):
+class MonthSelector(Spinner):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.option_cls = DateSpinnerItem
-        self.dropdown_cls = DateDropDown
-        self.background_normal = 'textures/button/inputbt_down.png'
-        self.background_color = (0, 0, 0, 0)
-
-    def on_is_open(self, inst, state):
-        super().on_is_open(inst, state)
-        inst.background_color = ((1, 1, 1, 1) if state else (0, 0, 0, 0))
+        self.option_cls = DateDropItem
+        self.effect_cls = ScrollEffect
+        self.background_normal = 'textures/button/picker_mid.png'
+        self.background_disabled_normal = 'textures/button/picker_mid.png'
+        self.background_down = 'textures/button/picker_mid_active.png'
+        self.disabled_color = (0, 0, 0, 1)
+        self.color = (0, 0, 0, 1)
+        self.font_size = 15
+        self.dropdown_cls.max_height = 180
 
 
 class DateTextField(TextInput):
     def __init__(self, prev, **kwargs):
         self.text_limit = len(prev)
         super().__init__(**kwargs)
-        self.background_color = (0, 0, 0, 0)
-        self.font_size = 11
-        self.foreground_color = (1, 1, 1, 1)
         self.disabled_foreground_color = (0, 0, 0, 1)
         self.cursor_color = (0, 0, 0, 1)
         self.multiline = False
         self.write_tab = False
         self.prev = prev
         self.text = prev
-        self.background_normal = 'textures/textinput/field.png'
-        self.background_active = 'textures/textinput/field_active.png'
 
     def on_focus(self, inst, state):
         if state:
             inst.prev = inst.text
             inst.text = ''
-        self.background_color = (1, 1, 1, 1) if state else (0, 0, 0, 0)
-        self.foreground_color = (0, 0, 0, 1) if state else (1, 1, 1, 1)
         if not state:
             self.parent.update_date(self)
 
@@ -892,14 +834,6 @@ class DateTextField(TextInput):
 
     def on_text_validate(self):
         self.text = self.text.zfill(self.text_limit)
-
-
-class DatePickerDelim(Label):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.size_hint = (0.01, 1)
-        self.color = (1, 1, 1, 1)
-        self.font_size = 13
 
 
 class DatePicker(BoxLayout):
@@ -939,25 +873,43 @@ class DatePicker(BoxLayout):
         self.timestamp = 0
         curr_year = datetime.now().year
 
-        self.year = DateTextField(size_hint = (0.29, 1),
+        self.year = DateTextField(size_hint = (0.25, 1),
+                                  background_normal = 'textures/button/'
+                                                      'picker_right.png',
+                                  background_disabled_normal = 'textures/button/'
+                                                               'picker_right.png',
+                                  background_active = 'textures/button/'
+                                                      'picker_right_active.png',
+                                  font_size = 15,
                                   prev = '1970')
+        self.month = MonthSelector(size_hint = (0.6, 1),
+                                   values = ('January', 'February', 'March',
+                                             'April', 'May', 'June', 'July',
+                                             'August', 'September', 'October',
+                                             'November', 'December'))
 
-        self.month = DateSpinner(size_hint = (0.5, 1),
-                                 font_size = 12,
-                                 values = ('January', 'February', 'March',
-                                           'April', 'May', 'June', 'July',
-                                           'August', 'September', 'October',
-                                           'November', 'December'))
-
-        self.day = DateTextField(size_hint = (0.2, 1),
+        self.day = DateTextField(size_hint = (0.15, 1),
+                                 background_normal = 'textures/button/'
+                                                     'picker_left.png',
+                                 background_disabled_normal = 'textures/button/'
+                                                              'picker_left.png',
+                                 background_active = 'textures/button/'
+                                                     'picker_left_active.png',
+                                 font_size = 15,
                                  prev = '01')
 
-        self.month.bind(text = self.update_date)
+        self.month.bind(on_select = self.update_date)
 
-        self.add_widget(DatePickerDelim())
         self.add_widget(self.day)
         self.add_widget(self.month)
         self.add_widget(self.year)
+
+
+class ExtDateDropItem(DateDropItem):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.font_size = 10
+        self.height = 15
 
 
 class ExtendedDatePicker(DatePicker):
@@ -970,23 +922,50 @@ class ExtendedDatePicker(DatePicker):
                               minute = int(self.minute.text),
                               second = int(self.second.text))
                 self.timestamp = ts.timestamp()
-            except (ValueError, OverflowError):
+            except (ValueError, OverflowError, KeyError):
                 inst.text = inst.prev
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.day.font_size = 11
+        self.month.font_size = 10
+        self.month.dropdown_cls.max_height = 90
+        self.month.option_cls = ExtDateDropItem
+        self.month.size_hint_x = 0.4
+        self.month.text = 'January'
+        self.day.size_hint_x = 0.18
+        self.year.font_size = 11
         self.hour = DateTextField(size_hint = (0.2, 1),
-                                  prev = '00')
+                                  prev = '00',
+                                  font_size = 11,
+                                  background_normal = 'textures/button/'
+                                                      'picker_left.png',
+                                  background_disabled_normal = 'textures/button/'
+                                                               'picker_left.png',
+                                  background_active = 'textures/button/'
+                                                      'picker_left_active.png')
         self.minute = DateTextField(size_hint = (0.2, 1),
-                                    prev = '00')
+                                    prev = '00',
+                                    background_normal = 'textures/button/'
+                                                        'picker_mid.png',
+                                    background_disabled_normal = 'textures/button/'
+                                                                 'picker_mid.png',
+                                    background_active = 'textures/button/'
+                                                        'picker_mid_active.png',
+                                    font_size = 11)
         self.second = DateTextField(size_hint = (0.2, 1),
-                                    prev = '00')
+                                    prev = '00',
+                                    background_normal = 'textures/button/'
+                                                        'picker_right.png',
+                                    background_disabled_normal = 'textures/button/'
+                                                                 'picker_right.png',
+                                    background_active = 'textures/button/'
+                                                        'picker_right_active.png',
+                                    font_size = 11)
 
-        self.add_widget(DatePickerDelim())
+        self.add_widget(Widget(size_hint_x = 0.03))
         self.add_widget(self.hour)
-        self.add_widget(DatePickerDelim(text=':'))
         self.add_widget(self.minute)
-        self.add_widget(DatePickerDelim(text=':'))
         self.add_widget(self.second)
 
 
@@ -1030,7 +1009,7 @@ class RegScreen(Screen):
                                     font_name = "fonts/NotoSans_R.ttf",
                                     text = " Login",
                                     on_release = app.to_login,
-                                    background_normal = 'textures/button/menu_bt_normal.png')
+                                    background_normal = 'textures/button/menubt_normal.png')
 
         self.lb_usr = Label(size_hint = (0.28, 0.03),
                             pos_hint = {"top": 0.75, "right": 0.255},
@@ -1559,7 +1538,7 @@ class LoginScreen(Screen):
                                        text = "[size=18][/size] Register",
                                        markup = True,
                                        on_release = app.to_register,
-                                       background_normal = 'textures/button/menu_bt_normal.png')
+                                       background_normal = 'textures/button/menubt_normal.png')
 
         self.lb_usr = Label(size_hint = (0.28, 0.03),
                             pos_hint = {"top": 0.67, "right": 0.255},
@@ -1791,16 +1770,16 @@ class DialogButtonBar(BoxLayout):
                                  size_hint = (0.19, 1),
                                  on_release = app.to_menu)
         self.opts_drop = DropDown()
-        self.opts_extender = BoxLayout(size_hint = (0.46, 1))
+        self.opts_extender = BoxLayout(size_hint = (0.475641, 1))
         self.opts = DialogButton(text = 'Options ',
                                  halign = 'right',
                                  on_release = self.drop_open)
         self.plc = Button(background_disabled_normal =
-                          'textures/button/menu_bt_normal.png',
+                          'textures/button/menubt_normal.png',
                           disabled = True,
                           size_hint = (0.35, 1))
         self.opts_plc = Button(background_disabled_normal =
-                               'textures/button/menu_bt_normal.png',
+                               'textures/button/menubt_normal.png',
                                disabled = True)
 
         self.search_bt = DialogOptButton('', 'Search for messages', 2,
