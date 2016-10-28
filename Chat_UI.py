@@ -43,12 +43,14 @@ from kivy.clock import Clock
 from kivy.graphics import Ellipse, Color, Rectangle
 from kivy.uix.image import Image
 from kivy.base import stopTouchApp
+from kivy.uix.filechooser import FileChooserListView, FileSystemLocal
+
 
 Builder.load_string('''
 <Label>:
     font_name: "fonts/NotoSans_R.ttf"
     halign: "center"
-    color: 0, 0, 0, 1
+    #color: 0, 0, 0, 1
 
 <Button>:
     color: 1, 1, 1, 1
@@ -60,6 +62,9 @@ Builder.load_string('''
     width: 250
     separator_height: 1
     title_font: "fonts/NotoSans_B.ttf"
+
+<AvatarSelectButton>:
+    color: (1, 1, 1, 0.5) if self.state == 'normal' else (1, 1, 1, 1)
 
 <ClockLabel>:
     text_size: self.size
@@ -628,7 +633,6 @@ class ProfileField(TextInput):
         self.background_disabled_normal = "textures/textinput/field.png"
         self.background_active = "textures/textinput/field_active.png"
         self.cursor_color = [0, 0, 0, 1]
-        #self.background_color = [0, 0, 0, 0]
         self.selection_color = [0.18, 0.65, 0.83, 0.5]
         self.disabled_foreground_color = [0, 0, 0, 1]
         self.disabled = not scr.editing
@@ -647,7 +651,8 @@ class ProfileLabel(FullSizeLabel):
         self.size_hint = (None, None)
         self.markup = True
         self.font_name = kwargs.get('font_name', 'fonts/NotoSans_R.ttf')
-        font_size = 15
+        self.color = (0, 0, 0, 1)
+
 
 
 class YesNoButton(Button):
@@ -656,6 +661,73 @@ class YesNoButton(Button):
 
 class EditButton(ToggleButton, ProfileButton):
     pass
+
+
+class ImageOnlyFileSystem(FileSystemLocal):
+    def listdir(self, fn):
+        for i in os.scandir(fn):
+            if i.is_dir():
+                yield i.name
+            else:
+                ext = i.name.lower()[-4:]
+                if ext == '.png' or ext == '.jpg':
+                    yield i.name
+
+
+class AvatarSelectButton(Button):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.text = ''
+        self.font_name = 'fonts/NotoSans_R.ttf'
+        self.font_size = 50
+        self.size_hint = None, None
+        self.background_color = (0, 0, 0, 0)
+        self.disabled_color = (0, 0, 0, 0)
+        self.disabled = True
+
+
+class AvatarSelectDialog(Popup):
+    def set_image(self, bt):
+        file = self.file_select.selection
+        if file:
+            if not file[0].endswith('.png') and not file[0].endswith('.jpg'):
+                ErrorDisp('The selected file should be a PNG or a JPG image').open()
+                return
+            self.cont.avatar.source = file[0]
+            self.dismiss()
+        else:
+            ErrorDisp('Please, select a file').open()
+
+    def __init__(self, cont, **kwargs):
+        super().__init__(**kwargs)
+        self.cont = cont
+        self.content = BoxLayout(orientation = 'vertical')
+        self.file_select = FileChooserListView()
+        self.file_select.file_system = ImageOnlyFileSystem()
+
+        self.button_box = BoxLayout(size_hint = (1, 0.1),
+                                    spacing = 4)
+        self.select_bt = Button(text = '[size=20][/size] Select',
+                                font_name = 'fonts/NotoSans_R.ttf',
+                                background_normal = 'textures/button/normal.png',
+                                background_down = 'textures/button/down.png',
+                                font_size = 16,
+                                markup = True,
+                                on_release = self.set_image)
+        self.cancel_bt = Button(text = '[size=20][/size] Cancel',
+                                font_name = 'fonts/NotoSans_R.ttf',
+                                background_normal = 'textures/button/normal.png',
+                                background_down = 'textures/button/down.png',
+                                font_size = 16,
+                                markup = True,
+                                on_release = self.dismiss)
+
+        self.content.add_widget(self.file_select)
+        self.content.add_widget(self.button_box)
+        self.button_box.add_widget(self.select_bt)
+        self.button_box.add_widget(self.cancel_bt)
+        self.title = 'Select a picture file'
+        self.size = (330, 450)
 
 
 class ProfilePage(FloatLayout):
@@ -685,6 +757,11 @@ class ProfilePage(FloatLayout):
             if profile_data.about != about:
                 app.change_profile_section('about', about)
                 profile_data.about = about
+
+            image_name = self.avatar.source
+            if profile_data.image_name != image_name:
+                app.set_image(image_name)
+                profile_data.image_name = image_name
         self.editing = not self.editing
 
     def __init__(self, **kwargs):
@@ -697,6 +774,12 @@ class ProfilePage(FloatLayout):
             Color(rgba = (1, 1, 1, 1))
             self.avatar = Ellipse(pos = (10, 360),
                                   size = (100, 100))
+
+        self.file_chooser = AvatarSelectDialog(self)
+
+        self.avatar_change = AvatarSelectButton(pos = (10, 360),
+                                                size = (100, 100),
+                                                on_press = self.file_chooser.open)
 
         self.nick_field = ProfileField(self,
                                        font_name = 'fonts/NotoSans_R.ttf',
@@ -742,10 +825,12 @@ class ProfilePage(FloatLayout):
                                        pos = (185, 10),
                                        on_press = print)
 
-        self.fields = [self.status_field,
+        self.fields = [self.avatar_change,
+                       self.status_field,
                        self.email_field,
                        self.about_field]
 
+        self.add_widget(self.avatar_change)
         self.add_widget(self.nick_field)
         self.add_widget(self.status_lb)
         self.add_widget(self.status_field)
@@ -1204,7 +1289,8 @@ class InfoBox(FloatLayout):
                                   pos = (5, 250))
         self.logged_as_lb = LoggedAsLabel(size_hint = (1, 0.25),
                                           pos_hint = {"top": 1},
-                                          font_size = 13)
+                                          font_size = 13,
+                                          color = (0, 0, 0, 1))
         self.add_widget(self.logged_as_lb)
 
 
@@ -1248,25 +1334,25 @@ class MenuScreen(Screen):
         self.info_box = InfoBox(size_hint = (1, 0.3))
 
         self.profile_bt = MenuButton(text = ('', "Profile"),
-                                     num = (14, 14),
+                                     num = (13, 13),
                                      on_release = app.to_self_profile)
 
         self.logout_dlg = LogoutDialog()
         self.logout_bt = MenuButton(text = ('', 'Log out'),
-                                    num = (13, 13),
+                                    num = (12, 12),
                                     on_release = self.logout_dlg.open)
 
         self.settings_bt = MenuButton(text = ('', 'Settings'),
-                                      num = (12, 13),
+                                      num = (11, 12),
                                       on_release = app.to_settings)
 
         self.help_bt = MenuButton(text = ('', 'Help'),
-                                  num = (15, 16),
+                                  num = (15, 15),
                                   on_release = app.to_help)
 
         self.quit_dlg = QuitDialog()
         self.quit_bt = MenuButton(text = ('', 'Quit'),
-                                  num = (16, 16),
+                                  num = (15, 15),
                                   on_release = self.quit_dlg.open)
 
         self.add_bar = MenuAddBar(size_hint = (1, 0.105))
@@ -1289,7 +1375,7 @@ class MenuScreen(Screen):
         self.div_online = RecordDivider(text = "online")
         self.div_offline = RecordDivider(text = "offline")
         self.div_req_sent = RecordDivider(text = "request sent")
-        self.div_blacklist = RecordDivider(text = "blacklist")
+        self.div_blacklist = RecordDivider(text = "blacklisted")
 
         self.add_widget(self.container)
 
@@ -2214,6 +2300,9 @@ class ChatApp(App):
 
     def change_profile_section(self, sect, chg):
         'change_profile_section'
+
+    def set_image(self, img_name):
+        'set_image'
 
     def send_msg(self, bt):
         text = self.msg_input.text.strip('\n ')
