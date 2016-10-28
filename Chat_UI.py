@@ -691,7 +691,8 @@ class AvatarSelectDialog(Popup):
         file = self.file_select.selection
         if file:
             if not file[0].endswith('.png') and not file[0].endswith('.jpg'):
-                ErrorDisp('The selected file should be a PNG or a JPG image').open()
+                ErrorDisp('The selected file should be '
+                          'a PNG or a JPG image').open()
                 return
             self.cont.avatar.source = file[0]
             self.dismiss()
@@ -1299,22 +1300,31 @@ class MenuScreen(Screen):
         self.users_disp.clear_widgets()
 
         add = self.users_disp.add_widget
-        add(self.div_favs)
+        if users[0]:
+            add(self.div_favs)
         for online, name in users[0]:
             add(FavRecord(online, name))
-        add(self.div_requests)
+
+        if users[1]:
+            add(self.div_requests)
         for online, name in users[1]:
             add(RequestGotRecord(online, name))
+
         add(self.div_online)
         for online, name in users[2]:
             add(FriendRecord(online, name))
+
         add(self.div_offline)
         for online, name in users[3]:
             add(FriendRecord(online, name))
-        add(self.div_req_sent)
+
+        if users[4]:
+            add(self.div_req_sent)
         for online, name in users[4]:
             add(RequestSentRecord(online, name))
-        add(self.div_blacklist)
+
+        if users[5]:
+            add(self.div_blacklist)
         for online, name in users[5]:
             add(BlacklistRecord(online, name))
 
