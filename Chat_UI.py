@@ -50,11 +50,12 @@ Builder.load_string('''
 <Label>:
     font_name: "fonts/NotoSans_R.ttf"
     halign: "center"
-    #color: 0, 0, 0, 1
 
 <Button>:
     color: 1, 1, 1, 1
     disabled_color: 1, 1, 1, 1
+    background_normal: 'textures/button/normal.png'
+    background_down: 'textures/button/down.png'
 
 <Popup>:
     size_hint: None, None
@@ -665,13 +666,17 @@ class EditButton(ToggleButton, ProfileButton):
 
 class ImageOnlyFileSystem(FileSystemLocal):
     def listdir(self, fn):
-        for i in os.scandir(fn):
-            if i.is_dir():
-                yield i.name
-            else:
-                ext = i.name.lower()[-4:]
-                if ext == '.png' or ext == '.jpg':
+        try:
+            for i in os.scandir(fn):
+                if i.is_dir():
                     yield i.name
+                else:
+                    ext = i.name.lower()[-4:]
+                    if ext == '.png' or ext == '.jpg':
+                        yield i.name
+        except PermissionError as e:
+            # strip the '[errno N]' part
+            ErrorDisp(str(e).partition('] ')[2]).open()
 
 
 class AvatarSelectButton(Button):
@@ -822,9 +827,11 @@ class ProfilePage(FloatLayout):
                                   pos = (20, 10),
                                   on_press = self.edit)
 
+        self.delete_dlg = DeleteProfileDialog()
+
         self.delete_bt = ProfileButton(text = "[size=20][/size] Delete",
                                        pos = (185, 10),
-                                       on_press = print)
+                                       on_press = self.delete_dlg.open)
 
         self.fields = [self.avatar_change,
                        self.status_field,
@@ -1224,20 +1231,20 @@ class YesNoDialog(Popup):
         pass
 
     def ch_no(self, bt):
-        pass
+        self.dismiss()
 
     def __init__(self, title, question):
         box = BoxLayout(orientation = "vertical")
-        self.height = 160
+        self.height = 200
         self.title = title
         self.title_size = 16
 
-        question_lb = Label(size_hint = (1, 0.6),
+        question_lb = Label(size_hint = (1, 0.7),
                             text = question,
                             color = (1, 1, 1, 1),
-                            font_name = "fonts/NotoSans_B.ttf")
+                            font_name = "fonts/NotoSans_R.ttf")
 
-        answers = BoxLayout(size_hint = (1, 0.4),
+        answers = BoxLayout(size_hint = (1, 0.3),
                                  spacing = 4,
                                  padding = 2)
         yes = YesNoButton(text = " Yes",
@@ -1265,9 +1272,6 @@ class LogoutDialog(YesNoDialog):
         self.dismiss()
         Clock.schedule_once(app.logout, 0.15)
 
-    def ch_no(self, bt):
-        self.dismiss()
-
 
 class QuitDialog(YesNoDialog):
     def __init__(self):
@@ -1278,8 +1282,16 @@ class QuitDialog(YesNoDialog):
         self.dismiss()
         stopTouchApp()
 
-    def ch_no(self, bt):
+
+class DeleteProfileDialog(YesNoDialog):
+    def __init__(self):
+        super().__init__(" Delete profile",
+                         "Are you sure you want\nto delete your profile?\n"
+                         "This action can't be undone")
+
+    def ch_yes(self, bt):
         self.dismiss()
+        app.delete_profile()
 
 
 class InfoBox(FloatLayout):
@@ -2253,11 +2265,9 @@ class ChatApp(App):
         self.menu_scr.info_box.logged_as_lb.text = "Logged in as\n" + self.nick
 
         self.get_profile_info(self.nick)
-        av = _Image.open('textures/panels/avatar_placeholder.png')
-        av.save('temp/self_avatar.png', 'PNG')
-        av.close()
 
-        self.menu_scr.info_box.avatar.source = 'temp/self_avatar.png'
+        self.menu_scr.info_box.avatar.source = ('textures/panels/'
+                                                'avatar_placeholder.png')
 
         self.get_user_groups()
 
@@ -2272,11 +2282,10 @@ class ChatApp(App):
         self.menu_scr.info_box.logged_as_lb.text = "Logged in as\n" + self.nick
 
         self.get_profile_info(self.nick)
-        av = _Image.open(self.profiles[self.nick].image_name)
-        av.save('temp/self_avatar.png', 'PNG')
-        av.close()
 
-        self.menu_scr.info_box.avatar.source = 'temp/self_avatar.png'
+        profile = self.profiles[self.nick]
+
+        self.menu_scr.info_box.avatar.source = profile.image_name
 
         self.get_user_groups()
 
@@ -2304,15 +2313,22 @@ class ChatApp(App):
 
     def get_profile_info(self, nick):
         'get_profile_info'
-        prof = ProfileData(nick, '', 150, 'undefined', '',
-                           'textures/panels/avatar_placeholder.png')
-        self.profiles[nick] = prof
+        if nick not in self.profiles:
+            prof = ProfileData(nick, '', 150, 'undefined', '',
+                               'textures/panels/avatar_placeholder.png')
+            self.profiles[nick] = prof
 
     def change_profile_section(self, sect, chg):
         'change_profile_section'
 
     def set_image(self, img_name):
         'set_image'
+        self.menu_scr.info_box.avatar.source = img_name
+
+    def delete_profile(self):
+        'delete_profile'
+        self.profiles.pop(self.nick)
+        self.to_login()
 
     def send_msg(self, bt):
         text = self.msg_input.text.strip('\n ')
