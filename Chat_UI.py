@@ -1071,6 +1071,15 @@ class HelpLabel(Label):
 
 
 class ShowPswdButton(ToggleButton):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.size_hint = (0.4, 0.15)
+        self.pos_hint = {"top": 0.16, "right": 0.4}
+        self.text = ' Show password'
+        self.font_name = "fonts/NotoSans_R.ttf"
+        self.background_color = (0, 0, 0, 0)
+        self.color = (0.4, 0.4, 0.4, 1)
+
     def on_state(self, bt, value):
         self.parent.toggle_psw(value)
 
@@ -1147,11 +1156,7 @@ class RegScreen(Screen):
                               background_disabled_normal = "textures/button/disabled_intro.png",
                               on_release = app.register)
 
-        self.show_psw = ShowPswdButton(size_hint = (0.4, 0.15),
-                                       pos_hint = {"top": 0.16, "right": 0.4},
-                                       text = ' Show password',
-                                       font_name = "fonts/NotoSans_R.ttf",
-                                       background_color = (0, 0, 0, 0))
+        self.show_psw = ShowPswdButton()
 
         self.add_widget(self.top_box)
 
@@ -1675,11 +1680,7 @@ class LoginScreen(Screen):
                               background_disabled_normal = "textures/button/disabled_intro.png",
                               on_release = app.login)
 
-        self.show_psw = ShowPswdButton(size_hint = (0.4, 0.15),
-                                       pos_hint = {"top": 0.16, "right": 0.4},
-                                       text = ' Show password',
-                                       font_name = "fonts/NotoSans_R.ttf",
-                                       background_color = (0, 0, 0, 0))
+        self.show_psw = ShowPswdButton()
 
         self.add_widget(self.top_box)
 
