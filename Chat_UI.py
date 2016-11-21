@@ -6,7 +6,7 @@ Config.set('graphics', 'width', 370)
 Config.set('graphics', 'height', 200)
 Config.set('graphics', 'resizable', False)
 
-import string, re, os
+import string, re, os, json
 from datetime import datetime
 import time
 from functools import partial
@@ -37,7 +37,6 @@ from kivy.uix.popup import Popup
 from kivy.uix.boxlayout import BoxLayout
 from kivy.utils import escape_markup
 from kivy.uix.dropdown import DropDown
-from kivy.uix.settings import Settings
 from kivy.uix.togglebutton import ToggleButton
 from kivy.uix.spinner import Spinner, SpinnerOption
 from kivy.clock import Clock
@@ -45,6 +44,9 @@ from kivy.graphics import Ellipse, Color, Rectangle
 from kivy.uix.image import Image
 from kivy.base import stopTouchApp
 from kivy.uix.filechooser import FileChooserListView, FileSystemLocal
+
+# For debugging purposes, will be removed
+from kivy.modules import inspector
 
 
 Builder.load_string('''
@@ -374,14 +376,6 @@ Builder.load_string('''
         RoundedRectangle:
             pos: self.x, self.y + 10
             size: self.width, self.height - 10
-    size_hint: None, None
-    show_arrow: False
-    pos: 170, 95
-    size: 175, 275
-    background_color: 0, 0, 0, 0
-    GridLayout:
-        id: smile_grid
-        cols: 5
 
 <SpinnerOption>:
     background_normal: 'textures/button/normal.png'
@@ -426,6 +420,18 @@ class FullSizeLabel(Label):
 
 
 class SmileButton(Button):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.background_normal = ''
+        self.background_down = ''
+        self.background_color = (0, 0, 0, 0)
+        self.font_size = 13
+        self.always_release = True
+        self.font_name = "fonts/NotoSans_B.ttf"
+        self.height = 20
+        self.size_hint = [1, None]
+
+
     def on_press(self):
         self.color = (0.6, 0.8, 1, 1)
 
@@ -488,8 +494,10 @@ class Message(BoxLayout):
     def on_touch_down(self, touch):
         if self.collide_point(*touch.pos):
             info_popup = self.scr.info_popup
+            date_obj = datetime.fromtimestamp(self.time // 100)
             sent_text = self.sent.format(self.sender,
-                                         datetime.fromtimestamp(self.time // 100).strftime("%H:%M:%S"))
+                                         date_obj.strftime("%H:%M:%S"))
+
             info_popup.info_view.info_lb.text = sent_text
             info_popup.info_view.msg_text.text = self.real_text
             info_popup.open()
@@ -497,6 +505,25 @@ class Message(BoxLayout):
 
 class SmileBubble(Bubble):
     hidden = BooleanProperty(True)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.size_hint = (None, None)
+        self.show_arrow = False
+        self.pos = (170, 95)
+        self.size = (175, 275)
+        self.background_color = (0, 0, 0, 0)
+        self.scroll = ScrollView(bar_inactive_color = (0, 0, 0, 0),
+                                 bar_color = (0.3, 0.3, 0.3, 0.7),
+                                 bar_margin = 3,
+                                 do_scroll_x = False,
+                                 size_hint = (1, 1))
+        self.smile_grid = GridLayout(cols = 5,
+                                     size_hint_y = None,
+                                     )
+        self.smile_grid.bind(minimum_height = self.smile_grid.setter('height'))
+
+        self.add_widget(self.scroll)
+        self.scroll.add_widget(self.smile_grid)
 
 
 class NickInput(TextInput):
@@ -656,7 +683,6 @@ class ProfileLabel(FullSizeLabel):
         self.markup = True
         self.font_name = kwargs.get('font_name', 'fonts/NotoSans_R.ttf')
         self.color = (0, 0, 0, 1)
-
 
 
 class YesNoButton(Button):
@@ -1112,7 +1138,8 @@ class RegScreen(Screen):
                                     font_name = "fonts/NotoSans_R.ttf",
                                     text = " Login",
                                     on_release = app.to_login,
-                                    background_normal = 'textures/button/menubt_normal.png')
+                                    background_normal =
+                                    'textures/button/menubt_normal.png')
 
         self.lb_usr = Label(size_hint = (0.28, 0.03),
                             pos_hint = {"top": 0.75, "right": 0.255},
@@ -1147,13 +1174,16 @@ class RegScreen(Screen):
                                 checker = self)
 
         self.bt_next = Button(size_hint = (0.4, 0.15),
-                              pos_hint = {"top": 0.14, "right": 0.94},
+                              pos_hint = {"top": 0.15, "right": 0.94},
                               text = "Next",
                               font_size = 16,
                               disabled = True,
-                              background_normal = "textures/button/normal_intro.png",
-                              background_down = "textures/button/down_intro.png",
-                              background_disabled_normal = "textures/button/disabled_intro.png",
+                              background_normal =
+                              "textures/button/normal_intro.png",
+                              background_down =
+                              "textures/button/down_intro.png",
+                              background_disabled_normal =
+                              "textures/button/disabled_intro.png",
                               on_release = app.register)
 
         self.show_psw = ShowPswdButton()
@@ -1647,7 +1677,8 @@ class LoginScreen(Screen):
                                        text = "[size=18][/size] Register",
                                        markup = True,
                                        on_release = app.to_register,
-                                       background_normal = 'textures/button/menubt_normal.png')
+                                       background_normal =
+                                       'textures/button/menubt_normal.png')
 
         self.lb_usr = Label(size_hint = (0.28, 0.03),
                             pos_hint = {"top": 0.67, "right": 0.255},
@@ -1671,7 +1702,7 @@ class LoginScreen(Screen):
                                  checker = self)
 
         self.bt_next = Button(size_hint = (0.4, 0.18),
-                              pos_hint = {"top": 0.165, "right": 0.94},
+                              pos_hint = {"top": 0.185, "right": 0.94},
                               text = "Next",
                               font_size = 16,
                               disabled = True,
@@ -1696,6 +1727,193 @@ class LoginScreen(Screen):
 
 class FramedScrollView(ScrollView):
     pass
+
+
+class SettingsItem(BoxLayout):
+    def __init__(self, title = '', changer = None, **kwargs):
+        super().__init__(**kwargs)
+        self.size_hint = (None, None)
+        with self.canvas:
+            Rectangle(size = self.size,
+                      pos = self.pos,
+                      source = 'textures/button/menubt_normal.png')
+        self.changer = changer(size_hint = (0.4, 1))
+        self.setting_name = FullSizeLabel(text = title,
+                                          bound = (40, 20),
+                                          halign = 'left',
+                                          size_hint = (0.6, 1))
+
+        self.add_widget(self.setting_name)
+        self.add_widget(self.changer)
+
+
+class SettingsLang(Button):
+    def on_press(self):
+        self.selector.open()
+
+    def select_lang(self, bt):
+        app.language = self.text = bt.text
+        self.selector.dismiss()
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.options = ['English', 'Русский']
+        self.text = app.language
+        self.background_color = (0, 0, 0, 0)
+        self.selector = Popup(title = 'Select a language',
+                              size = (200, 250))
+        self.selector.content = BoxLayout(orientation = 'vertical',
+                                          padding = 10,
+                                          spacing = 6)
+        for lang in self.options:
+            bt = Button(text = lang,
+                        on_release = self.select_lang)
+            self.selector.content.add_widget(bt)
+
+        self.selector.content.add_widget(Widget(size_hint = (1, 0.1)))
+
+        self.cancel = Button(text = 'Cancel',
+                             on_release = self.selector.dismiss)
+        self.selector.content.add_widget(self.cancel)
+
+
+class SettingsTheme(Button):
+    def on_press(self):
+        self.selector.open()
+
+    def select_thm(self, bt):
+        app.theme_name = self.text = bt.text
+        self.selector.dismiss()
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.options = ['Blue (default)']
+        self.text = app.theme_name
+        self.background_color = (0, 0, 0, 0)
+        self.selector = Popup(title = 'Select a theme',
+                              size = (200, 250))
+        self.selector.content = BoxLayout(orientation = 'vertical',
+                                          padding = 10,
+                                          spacing = 6)
+        for theme in self.options:
+            bt = Button(text = theme,
+                        on_release = self.select_thm)
+            self.selector.content.add_widget(bt)
+
+        self.selector.content.add_widget(Widget(size_hint = (1, 0.1)))
+
+        self.cancel = Button(text = 'Cancel',
+                             on_release = self.selector.dismiss)
+        self.selector.content.add_widget(self.cancel)
+
+
+class SettingsBar(BoxLayout):
+    def to_menu(self, bt):
+        sets = {'lang': app.language,
+                'thm': app.theme_name}
+        smiles = self.parent.smile_grid.children
+        for sm in smiles:
+            sets['s' + str(sm.num)] = sm.text
+
+        with open('settings', 'w') as f:
+            json.dump(sets, f, ensure_ascii = False, indent = 2)
+
+        app.to_menu()
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.back_bt = Button(text = "  Back",
+                              size_hint = (0.15, 1),
+                              font_name = 'fonts/NotoSans_B.ttf',
+                              background_normal = 'textures/button/'
+                                                  'menubt_normal.png',
+                              background_down = 'textures/button/'
+                                                'inputbt_down.png',
+                              on_release = self.to_menu)
+
+        self.title = Button(disabled = True,
+                            background_disabled_normal = 'textures/button/'
+                                                         'menubt_normal.png',
+                            size_hint = (0.7, 1),
+                            text = "Settings",
+                            font_name = 'fonts/NotoSans_B.ttf')
+        self.plc = Button(disabled = True,
+                          background_disabled_normal = 'textures/button/'
+                                                       'menubt_normal.png',
+                          size_hint = (0.15, 1))
+
+        self.add_widget(self.back_bt)
+        self.add_widget(self.title)
+        self.add_widget(self.plc)
+
+
+class SmileInput(MessageInput):
+    def on_text(self, inst, text):
+        if len(text) > 5:
+            self.text = text[:-1]
+
+    def __init__(self, num, **kwargs):
+        super().__init__(':)', **kwargs)
+        self.num = num
+        self.font_size = 13
+        self.background_normal = 'textures/textinput/field.png'
+        self.background_active = 'textures/textinput/field_active.png'
+
+
+class SettingsScreen(Screen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.bar = SettingsBar(size_hint = (1, 0.1),
+                               pos_hint = {"top": 1})
+
+        self.lang = SettingsItem(title = 'Language',
+                                 changer = SettingsLang,
+                                 pos = (0, 350),
+                                 size = (500, 40))
+
+        self.thm = SettingsItem(title = 'UI Theme',
+                                changer = SettingsTheme,
+                                pos = (0, 300),
+                                size = (500, 40))
+
+        self.smile_lb = Button(text = 'Custom smiles:',
+                               size_hint = (None, None),
+                               disabled = True,
+                               background_disabled_normal =
+                               'textures/button/normal.png',
+                               size = (150, 30),
+                               pos_hint = {"center_x": 0.5, "top": 0.63})
+
+        self.smile_grid = GridLayout(size_hint = (None, None),
+                                     size = (400, 80),
+                                     pos = (50, 150),
+                                     spacing = 20,
+                                     cols = 5,
+                                     rows = 2)
+
+        self.restart_warn = Button(text = 'If you change any of these settings'
+                                          ', you should restart the app for'
+                                          ' them to take effect',
+                                   pos = (0, 10),
+                                   size = (500, 20),
+                                   disabled = True,
+                                   background_disabled_normal =
+                                   'textures/button/menubt_normal.png',
+                                   size_hint = (None, None),
+                                   font_size = 12)
+
+        for i in range(10):
+            tx = SmileInput(i)
+            self.smile_grid.add_widget(tx)
+
+
+        self.add_widget(self.bar)
+        self.add_widget(self.lang)
+        self.add_widget(self.thm)
+        self.add_widget(self.smile_lb)
+        self.add_widget(self.smile_grid)
+        self.add_widget(self.restart_warn)
+
 
 
 class SearchInput(MessageInput):
@@ -1826,16 +2044,10 @@ class DialogScreen(Screen):
         self.input_bar = DialogInputBar(size_hint = (1, 0.2))
 
         self.smile_bbl = SmileBubble()
-        grid = self.smile_bbl.ids['smile_grid']
         for smile in self.smiles:
-            grid.add_widget(SmileButton(text=smile,
-                                        on_release = self.input_bar.add_smile,
-                                        background_normal = '',
-                                        background_down = '',
-                                        background_color = (0, 0, 0, 0),
-                                        font_size = 13,
-                                        always_release = True,
-                                        font_name = "fonts/NotoSans_B.ttf"))
+            bt = SmileButton(text=smile,
+                             on_release = self.input_bar.add_smile)
+            self.smile_bbl.smile_grid.add_widget(bt)
 
         self.info_popup = MsgInfoPopup()
 
@@ -2149,7 +2361,12 @@ class ChatApp(App):
              [('user5', True)],
              [('user6', False)]]
     profiles = {}
-    msg_amount = 25
+    msg_amount = 50
+    language = StringProperty('English')
+    theme_name = StringProperty('Blue (default)')
+
+    def on_language(self, inst, lang):
+        print('Current language:', lang)
 
     def back_to_search(self, bt = None):
         self.screens.current = 'menu'
@@ -2209,7 +2426,7 @@ class ChatApp(App):
         self.screens.current = 'profile'
 
     def to_settings(self, bt = None):
-        pass
+        self.screens.current = 'settings'
 
     def to_help(self, bt = None):
         pass
@@ -2358,11 +2575,13 @@ class ChatApp(App):
             os.remove(i.path)
         os.rmdir('temp')
 
+    def open_settings(self):
+        pass
+
     def build(self):
         Window.clearcolor = (0.71, 0.85, 1, 1)
         self.nick = ''
         self.person = ''
-        self.msg_stack = []
 
         self.return_scr = 'menu'
         self.back_action = self.back_to_screen
@@ -2381,6 +2600,7 @@ class ChatApp(App):
         self.help = Screen(name = "help")
         self.self_profile_scr = SelfProfile(name = "self_profile")
         self.profile_scr = Profile(name = "profile")
+        self.settings_scr = SettingsScreen(name = "settings")
 
         self.help_box = BoxLayout(orientation = "vertical")
 
@@ -2394,11 +2614,14 @@ class ChatApp(App):
         self.screens.add_widget(self.help)
         self.screens.add_widget(self.self_profile_scr)
         self.screens.add_widget(self.profile_scr)
+        self.screens.add_widget(self.settings_scr)
 
         self.help.add_widget(self.help_box)
 
         self.help_box.add_widget(self.help_bar)
         self.help_box.add_widget(self.help_text)
+
+        inspector.create_inspector(Window, self.screens)
         return self.screens
 
 
