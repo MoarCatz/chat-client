@@ -447,7 +447,8 @@ class ClockLabel(Label):
 
 class Message(BoxLayout):
     bg_color = ListProperty([0.99, 0.99, 0.99, 1])
-    tw = TextWrapper(width = 20)
+    tw = TextWrapper(width = 20,
+                     replace_whitespace = False)
     sent = ('Sender: [color=#B6DAFF]{}[/color]'
             '\nTime: [color=#C8C8C8]{}[/color]')
 
@@ -468,7 +469,10 @@ class Message(BoxLayout):
         spl = re.split('(\n{2,})', text)
         res = ''
         for idx, part in enumerate(spl):
-            res += part if idx % 2 else self.tw.fill(part)
+            if idx % 2 == 0:
+                res += part
+            else:
+                res += '\n'.join(self.tw.fill(i) for i in part.split('\n'))
         return res
 
     def __init__(self, text, tm, sender, scr, **kwargs):
@@ -505,21 +509,33 @@ class Message(BoxLayout):
 
 class SmileBubble(Bubble):
     hidden = BooleanProperty(True)
-    def __init__(self, **kwargs):
+    def build_btns(self):
+        self.smile_grid.clear_widgets()
+        smiles = self.scr.smiles[:]
+        for i in range(10):
+            sm = app.settings[str(i)]
+            if sm:
+                smiles.append(sm)
+
+        for smile in smiles:
+            bt = SmileButton(text = smile,
+                             on_release = self.scr.input_bar.add_smile)
+            self.smile_grid.add_widget(bt)
+
+    def __init__(self, scr, **kwargs):
         super().__init__(**kwargs)
         self.size_hint = (None, None)
         self.show_arrow = False
         self.pos = (170, 95)
         self.size = (175, 275)
         self.background_color = (0, 0, 0, 0)
-        self.scroll = ScrollView(bar_inactive_color = (0, 0, 0, 0),
-                                 bar_color = (0.3, 0.3, 0.3, 0.7),
-                                 bar_margin = 3,
+        self.scr = scr
+
+        self.scroll = ScrollView(bar_color = (0, 0, 0, 0),
                                  do_scroll_x = False,
                                  size_hint = (1, 1))
         self.smile_grid = GridLayout(cols = 5,
-                                     size_hint_y = None,
-                                     )
+                                     size_hint_y = None)
         self.smile_grid.bind(minimum_height = self.smile_grid.setter('height'))
 
         self.add_widget(self.scroll)
@@ -1813,10 +1829,12 @@ class SettingsBar(BoxLayout):
                 'thm': app.theme_name}
         smiles = self.parent.smile_grid.children
         for sm in smiles:
-            sets['s' + str(sm.num)] = sm.text
+            sets[str(sm.num)] = sm.text
 
         with open('settings', 'w') as f:
             json.dump(sets, f, ensure_ascii = False, indent = 2)
+
+        app.settings = sets
 
         app.to_menu()
 
@@ -1855,6 +1873,7 @@ class SmileInput(MessageInput):
     def __init__(self, num, **kwargs):
         super().__init__(':)', **kwargs)
         self.num = num
+        self.text = app.settings[str(num)]
         self.font_size = 13
         self.background_normal = 'textures/textinput/field.png'
         self.background_active = 'textures/textinput/field_active.png'
@@ -1913,7 +1932,6 @@ class SettingsScreen(Screen):
         self.add_widget(self.smile_lb)
         self.add_widget(self.smile_grid)
         self.add_widget(self.restart_warn)
-
 
 
 class SearchInput(MessageInput):
@@ -2043,11 +2061,7 @@ class DialogScreen(Screen):
 
         self.input_bar = DialogInputBar(size_hint = (1, 0.2))
 
-        self.smile_bbl = SmileBubble()
-        for smile in self.smiles:
-            bt = SmileButton(text=smile,
-                             on_release = self.input_bar.add_smile)
-            self.smile_bbl.smile_grid.add_widget(bt)
+        self.smile_bbl = SmileBubble(self)
 
         self.info_popup = MsgInfoPopup()
 
@@ -2365,9 +2379,6 @@ class ChatApp(App):
     language = StringProperty('English')
     theme_name = StringProperty('Blue (default)')
 
-    def on_language(self, inst, lang):
-        print('Current language:', lang)
-
     def back_to_search(self, bt = None):
         self.screens.current = 'menu'
         Window.size = (500, 450)
@@ -2435,7 +2446,9 @@ class ChatApp(App):
         Window.size = (350, 500)
         name = bt.text
         self.person = name
-        self.screens.get_screen(name).status_bar.update_names(bt)
+        d_scr = self.screens.get_screen(name)
+        d_scr.status_bar.update_names(bt)
+        d_scr.smile_bbl.build_btns()
 
         self.screens.current = self.person
 
@@ -2578,18 +2591,37 @@ class ChatApp(App):
     def open_settings(self):
         pass
 
+    def get_settings(self):
+        if not os.path.exists('settings'):
+            sets = {'lang': self.language,
+                    'thm': self.theme_name}
+            for i in range(10):
+                sets[str(i)] = ''
+
+            with open('settings', 'w') as f:
+                json.dump(sets, f,
+                          ensure_ascii = False,
+                          indent = 2,
+                          sort_keys = True)
+            return sets
+
+        with open('settings') as f:
+            return json.load(f)
+
     def build(self):
         Window.clearcolor = (0.71, 0.85, 1, 1)
         self.nick = ''
         self.person = ''
 
+        self.settings = self.get_settings()
+
+        self.language = self.settings['lang']
+        self.theme_name = self.settings['thm']
+
         self.return_scr = 'menu'
         self.back_action = self.back_to_screen
 
-        self.people = ["UpperBot"]
-
         self.no_trans = NoTransition()
-
         self.slide_trans = SlideTransition(direction = "up")
 
         self.screens = ScreenManager(transition = self.no_trans)
@@ -2597,30 +2629,16 @@ class ChatApp(App):
         self.register_scr = RegScreen(name = "register")
         self.login_scr = LoginScreen(name = "login")
         self.menu_scr = MenuScreen(name = "menu")
-        self.help = Screen(name = "help")
         self.self_profile_scr = SelfProfile(name = "self_profile")
         self.profile_scr = Profile(name = "profile")
         self.settings_scr = SettingsScreen(name = "settings")
 
-        self.help_box = BoxLayout(orientation = "vertical")
-
-        self.help_bar = HelpBar(size_hint = (1, 0.064))
-
-        self.help_text = HelpLabel()
-
         self.screens.add_widget(self.login_scr)
         self.screens.add_widget(self.register_scr)
         self.screens.add_widget(self.menu_scr)
-        self.screens.add_widget(self.help)
         self.screens.add_widget(self.self_profile_scr)
         self.screens.add_widget(self.profile_scr)
         self.screens.add_widget(self.settings_scr)
-
-        self.help.add_widget(self.help_box)
-
-        self.help_box.add_widget(self.help_bar)
-        self.help_box.add_widget(self.help_text)
-
         inspector.create_inspector(Window, self.screens)
         return self.screens
 
