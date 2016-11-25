@@ -13,9 +13,6 @@ from functools import partial
 from PIL import Image as _Image
 from textwrap import TextWrapper
 
-if not os.path.isdir('temp'):
-    os.mkdir('temp')
-
 from kivy.app import App
 from kivy.lang import Builder
 from kivy.core.window import Window
@@ -44,6 +41,7 @@ from kivy.graphics import Ellipse, Color, Rectangle
 from kivy.uix.image import Image
 from kivy.base import stopTouchApp
 from kivy.uix.filechooser import FileChooserListView, FileSystemLocal
+from kivy.uix.tabbedpanel import TabbedPanel, TabbedPanelHeader
 
 # For debugging purposes, will be removed
 from kivy.modules import inspector
@@ -109,40 +107,6 @@ Builder.load_string('''
 <FullSizeLabel>:
     text_size: self.width - self.bound[0], self.height - self.bound[1]
 
-<HelpBar>:
-    MenuButton:
-        disabled: True
-        size_hint: 0.33, 1
-    MenuButton:
-        text: " Help"
-        size_hint: 0.27, 1
-        background_normal: 'textures/button/inputbt_down.png'
-        background_down: 'textures/button/menubt_normal.png'
-        on_press: app.hide_screen(self, 'up')
-    MenuButton:
-        disabled: True
-
-<HelpLabel>:
-    canvas.before:
-        Color:
-            rgba: 1, 1, 1, 1
-        Rectangle:
-            pos: self.pos
-            size: self.size
-        Color:
-            rgba: 0.5, 0.5, 0.5, 1
-        Line:
-            points: self.x, self.y + self.height, \
-                    self.x + self.width, self.y + self.height, \
-                    self.x + self.width, self.y, \
-                    self.x, self.y, \
-                    self.x, self.y + self.height
-    markup: True
-    font_size: 15
-    text_size: self.size
-    halign: "left"
-    valign: "top"
-
 <InputBox>:
     canvas:
         Color:
@@ -193,17 +157,6 @@ Builder.load_string('''
         Rectangle:
             pos: self.x, self.y + 1
             size: self.width, self.height - 2
-    Widget:
-        size_hint: 0.7, 1
-    Button:
-        id: add_bt
-        text: "[size=20][/size] Add"
-        size_hint: 0.3, 1
-        markup: True
-        font_name: 'fonts/NotoSans_B.ttf'
-        font_size: 17
-        background_normal: 'textures/button/menubt_normal.png'
-        background_down: 'textures/button/inputbt_down.png'
 
 <MenuButton>:
     size_hint: 1, 0.09
@@ -225,7 +178,8 @@ Builder.load_string('''
             size: self.size
             pos: self.pos
         Line:
-            points: self.x + self.width, self.y, self.x + self.width, self.y + self.height
+            points: self.x + self.width, self.y, \
+                    self.x + self.width, self.y + self.height
 
 <Message>:
     canvas:
@@ -411,12 +365,79 @@ Builder.load_string('''
 ''')
 
 
+def _get_settings():
+    if not os.path.exists('settings.json'):
+        sets = {'lang': 'English',
+                'thm': 'Blue (default)'}
+        for i in range(10):
+            sets[str(i)] = ''
+
+        with open('settings.json', 'w') as f:
+            json.dump(sets, f,
+                      ensure_ascii = False,
+                      indent = 2,
+                      sort_keys = True)
+        return sets
+
+    with open('settings.json') as f:
+        return json.load(f)
+
+
+class EngLoc:
+    def __getitem__(self, key):
+        return key
+
+
+class RusLoc:
+    with open('local_ru.json') as f:
+        translator = json.load(f)
+
+    def __getitem__(self, key):
+        return self.translator[key]
+
+
+lang = _get_settings()['lang']
+# This variable will hold an object responsible for localization
+l = EngLoc() if lang == 'English' else RusLoc()
+del lang
+
+
 class FullSizeButton(Button):
     bound = ListProperty([0, 0])
 
 
 class FullSizeLabel(Label):
     bound = ListProperty([0, 0])
+
+
+class HelpPage(TabbedPanelHeader):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.background_normal = 'textures/button/tab.png'
+        self.background_down = 'textures/button/tab_active.png'
+
+
+class HelpScreen(Screen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.cont = BoxLayout(orientation = 'vertical')
+        self.bar = BackBar(title = l['Help'],
+                           size_hint = (1, 0.1))
+        self.tabs = TabbedPanel(tab_height = 20,
+                                do_default_tab = False,
+                                tab_pos = 'bottom_left')
+
+        self.help_page = HelpPage()
+        self.about_page = HelpPage()
+
+        self.tabs.add_widget(self.help_page)
+        self.tabs.add_widget(self.about_page)
+        self.tabs._tab_layout.padding = 0
+
+        self.cont.add_widget(self.bar)
+        self.cont.add_widget(self.tabs)
+
+        self.add_widget(self.cont)
 
 
 class SmileButton(Button):
@@ -449,8 +470,9 @@ class Message(BoxLayout):
     bg_color = ListProperty([0.99, 0.99, 0.99, 1])
     tw = TextWrapper(width = 20,
                      replace_whitespace = False)
-    sent = ('Sender: [color=#B6DAFF]{}[/color]'
-            '\nTime: [color=#C8C8C8]{}[/color]')
+    sent = (l['Sender'] + ': [color=#B6DAFF]{}[/color]\n' +
+            l['Time'] + ': [color=#C8C8C8]{}[/color]\n' +
+            l['Date'] + ': [color=#C8C8C8]{}[/color]')
 
     def width_modify(self):
         min_width = 160
@@ -499,8 +521,8 @@ class Message(BoxLayout):
         if self.collide_point(*touch.pos):
             info_popup = self.scr.info_popup
             date_obj = datetime.fromtimestamp(self.time // 100)
-            sent_text = self.sent.format(self.sender,
-                                         date_obj.strftime("%H:%M:%S"))
+            date, time = date_obj.strftime("%d/%m/%Y %H:%M:%S").split()
+            sent_text = self.sent.format(self.sender, time, date)
 
             info_popup.info_view.info_lb.text = sent_text
             info_popup.info_view.msg_text.text = self.real_text
@@ -593,6 +615,7 @@ class InfoView(BoxLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.orientation = 'vertical'
+        self.padding = 2
 
         self.info_lb = FullSizeLabel(markup = True,
                                      halign = 'left',
@@ -601,47 +624,39 @@ class InfoView(BoxLayout):
                                      font_size = 15,
                                      color = (1, 1, 1, 1))
 
-        self.msg_label = Label(text = "Message text:",
+        self.msg_label = Label(text = l["Message text:"],
                                font_name = "fonts/NotoSans_B.ttf",
-                               size_hint = (1, 0.15),
+                               size_hint = (1, 0.1),
                                font_size = 13,
                                color = (1, 1, 1, 1))
 
         self.msg_text = TextInput(readonly = True,
                                   cursor_color = (0, 0, 0, 0),
-                                  background_normal = "textures/textinput/"
-                                                      "msginput_unfocused.png",
-                                  background_active = "textures/textinput/"
-                                                      "msginput_unfocused.png")
+                                  size_hint = (1, 0.6),
+                                  background_normal =
+                                  'textures/textinput/msginput_unfocused.png',
+                                  background_active =
+                                  'textures/textinput/msginput_unfocused.png')
 
         self.add_widget(self.info_lb)
         self.add_widget(self.msg_label)
         self.add_widget(self.msg_text)
 
 
-
-class ChatTopBar(BoxLayout):
-    pass
-
-
-class HelpBar(BoxLayout):
-    pass
-
-
 class ProfileBar(BoxLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.back_bt = Button(text = "   Back",
-                              size_hint = (0.2, 1),
+        self.back_bt = Button(text = '   ' + l['Back'],
+                              size_hint = (0.23, 1),
                               font_name = 'fonts/NotoSans_R.ttf',
-                              background_normal = 'textures/button/'
-                                                  'menubt_normal.png',
-                              background_down = 'textures/button/'
-                                                'inputbt_down.png')
+                              background_normal =
+                              'textures/button/menubt_normal.png',
+                              background_down =
+                              'textures/button/inputbt_down.png')
         self.back_bt.bind(on_release = app.back_action)
         self.plc = Button(disabled = True,
-                          background_disabled_normal = 'textures/button/'
-                                                       'menubt_normal.png',
+                          background_disabled_normal =
+                          'textures/button/menubt_normal.png',
                           size_hint = (1, 1))
         self.add_widget(self.back_bt)
         self.add_widget(self.plc)
@@ -696,9 +711,10 @@ class ProfileLabel(FullSizeLabel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.size_hint = (None, None)
-        self.markup = True
+        self.halign = 'right'
         self.font_name = kwargs.get('font_name', 'fonts/NotoSans_R.ttf')
         self.color = (0, 0, 0, 1)
+        self.font_size = 12
 
 
 class YesNoButton(Button):
@@ -737,37 +753,42 @@ class AvatarSelectButton(Button):
 
 
 class AvatarSelectDialog(Popup):
+    wrong_ext = l['The selected file should be a PNG or a JPG image']
     def set_image(self, bt):
         file = self.file_select.selection
         if file:
             if not file[0].endswith('.png') and not file[0].endswith('.jpg'):
-                ErrorDisp('The selected file should be '
-                          'a PNG or a JPG image').open()
+                ErrorDisp(self.wrong_ext).open()
                 return
             self.cont.avatar.source = file[0]
             self.dismiss()
         else:
-            ErrorDisp('Please, select a file').open()
+            ErrorDisp(l['Please, select a file']).open()
 
     def __init__(self, cont, **kwargs):
         super().__init__(**kwargs)
         self.cont = cont
         self.content = BoxLayout(orientation = 'vertical')
         self.file_select = FileChooserListView()
+        name_size = self.file_select.layout.children[0].children[1].children
+        name_size[1].text = l['Size']
+        name_size[2].text = l['Name']
         self.file_select.file_system = ImageOnlyFileSystem()
 
         self.button_box = BoxLayout(size_hint = (1, 0.1),
                                     spacing = 4)
-        self.select_bt = Button(text = '[size=20][/size] Select',
+        self.select_bt = Button(text = '[size=20][/size] ' + l['Select'],
                                 font_name = 'fonts/NotoSans_R.ttf',
-                                background_normal = 'textures/button/normal.png',
+                                background_normal =
+                                'textures/button/normal.png',
                                 background_down = 'textures/button/down.png',
                                 font_size = 16,
                                 markup = True,
                                 on_release = self.set_image)
-        self.cancel_bt = Button(text = '[size=20][/size] Cancel',
+        self.cancel_bt = Button(text = '[size=20][/size] ' + l['Cancel'],
                                 font_name = 'fonts/NotoSans_R.ttf',
-                                background_normal = 'textures/button/normal.png',
+                                background_normal =
+                                'textures/button/normal.png',
                                 background_down = 'textures/button/down.png',
                                 font_size = 16,
                                 markup = True,
@@ -777,7 +798,7 @@ class AvatarSelectDialog(Popup):
         self.content.add_widget(self.button_box)
         self.button_box.add_widget(self.select_bt)
         self.button_box.add_widget(self.cancel_bt)
-        self.title = 'Select a picture file'
+        self.title = l['Select a picture file']
         self.size = (330, 450)
 
 
@@ -830,7 +851,8 @@ class ProfilePage(FloatLayout):
 
         self.avatar_change = AvatarSelectButton(pos = (10, 360),
                                                 size = (100, 100),
-                                                on_press = self.file_chooser.open)
+                                                on_press =
+                                                self.file_chooser.open)
 
         self.nick_field = ProfileField(self,
                                        font_name = 'fonts/NotoSans_R.ttf',
@@ -840,21 +862,21 @@ class ProfilePage(FloatLayout):
                                        height = 35)
 
         self.status_lb = ProfileLabel(pos = (120, 410),
-                                      size = (40, 15),
+                                      size = (50, 15),
                                       font_size = 12,
-                                      text = "Status:")
+                                      text = l['Status:'])
         self.status_field = ProfileField(self,
                                          pos = (120, 375))
 
         self.email_lb = ProfileLabel(pos = (10, 325),
                                      height = 20,
-                                     text = "[size=18][/size]       Email:")
+                                     text = l['Email:'])
         self.email_field = ProfileField(self,
                                         pos = (120, 320))
 
         self.birthday_lb = ProfileLabel(pos = (10, 285),
                                         height = 20,
-                                        text = "[size=18][/size]  Birthday:")
+                                        text = l['Birthday:'])
         self.birthday_field = DatePicker(pos = (120, 280),
                                          size = (220, 30),
                                          size_hint = (None, None),
@@ -862,19 +884,20 @@ class ProfilePage(FloatLayout):
 
         self.about_lb = ProfileLabel(pos = (10, 243),
                                      height = 20,
-                                     text = "[size=18][/size]      About:")
+                                     text = l['About:'])
         self.about_field = ProfileField(self,
                                         pos = (120, 115),
                                         height = 155,
                                         multiline = True)
 
-        self.edit_bt = EditButton(text = "[size=18][/size] Edit",
+        self.edit_bt = EditButton(text = '[size=18][/size] ' + l['Edit'],
                                   pos = (20, 10),
                                   on_press = self.edit)
 
         self.delete_dlg = DeleteProfileDialog()
 
-        self.delete_bt = ProfileButton(text = "[size=20][/size] Delete",
+        self.delete_bt = ProfileButton(text = '[size=20][/size] ' +
+                                              l['Delete'],
                                        pos = (185, 10),
                                        on_press = self.delete_dlg.open)
 
@@ -955,10 +978,13 @@ class DateTextField(TextInput):
         self.prev = prev
         self.text = prev
 
+    def prepare(self, inst):
+        self.prev = self.text
+        self.text = ''
+
     def on_focus(self, inst, state):
         if state:
-            inst.prev = inst.text
-            inst.text = ''
+            Clock.schedule_once(self.prepare, 0.02)
         if not state:
             self.parent.update_date(self)
 
@@ -973,18 +999,18 @@ class DateTextField(TextInput):
 
 
 class DatePicker(BoxLayout):
-    month_match = {'January':   1,
-                   'February':  2,
-                   'March':     3,
-                   'April':     4,
-                   'May':       5,
-                   'June':      6,
-                   'July':      7,
-                   'August':    8,
-                   'September': 9,
-                   'October':  10,
-                   'November': 11,
-                   'December': 12}
+    month_match = {l['January']:    1,
+                   l['February']:   2,
+                   l['March']:      3,
+                   l['April']:      4,
+                   l['May']:        5,
+                   l['June']:       6,
+                   l['July']:       7,
+                   l['August']:     8,
+                   l['September']:  9,
+                   l['October']:   10,
+                   l['November']:  11,
+                   l['December']:  12}
 
     def update_date(self, inst, tx = None):
         try:
@@ -1010,31 +1036,30 @@ class DatePicker(BoxLayout):
         curr_year = datetime.now().year
 
         self.year = DateTextField(size_hint = (0.25, 1),
-                                  background_normal = 'textures/button/'
-                                                      'picker_right.png',
-                                  background_disabled_normal = 'textures/button/'
-                                                               'picker_right.png',
-                                  background_active = 'textures/button/'
-                                                      'picker_right_active.png',
+                                  background_normal =
+                                  'textures/button/picker_right.png',
+                                  background_disabled_normal =
+                                  'textures/button/picker_right.png',
+                                  background_active =
+                                  'textures/button/picker_right_active.png',
                                   font_size = 15,
                                   prev = '1970')
         self.month = MonthSelector(size_hint = (0.6, 1),
-                                   values = ('January', 'February', 'March',
-                                             'April', 'May', 'June', 'July',
-                                             'August', 'September', 'October',
-                                             'November', 'December'))
+                                   values = (l['January'], l['February'],
+                                             l['March'], l['April'], l['May'],
+                                             l['June'], l['July'], l['August'],
+                                             l['September'], l['October'],
+                                             l['November'], l['December']))
 
         self.day = DateTextField(size_hint = (0.15, 1),
-                                 background_normal = 'textures/button/'
-                                                     'picker_left.png',
-                                 background_disabled_normal = 'textures/button/'
-                                                              'picker_left.png',
-                                 background_active = 'textures/button/'
-                                                     'picker_left_active.png',
+                                 background_normal =
+                                 'textures/button/picker_left.png',
+                                 background_disabled_normal =
+                                 'textures/button/picker_left.png',
+                                 background_active =
+                                 'textures/button/picker_left_active.png',
                                  font_size = 15,
                                  prev = '01')
-
-        self.month.bind(on_select = self.update_date)
 
         self.add_widget(self.day)
         self.add_widget(self.month)
@@ -1067,36 +1092,37 @@ class ExtendedDatePicker(DatePicker):
         self.month.font_size = 10
         self.month.dropdown_cls.max_height = 90
         self.month.option_cls = ExtDateDropItem
+        self.month.option_cls.on_release = self.update_date
         self.month.size_hint_x = 0.4
-        self.month.text = 'January'
+        self.month.text = l['January']
         self.day.size_hint_x = 0.18
         self.year.font_size = 11
         self.hour = DateTextField(size_hint = (0.2, 1),
                                   prev = '00',
                                   font_size = 11,
-                                  background_normal = 'textures/button/'
-                                                      'picker_left.png',
-                                  background_disabled_normal = 'textures/button/'
-                                                               'picker_left.png',
-                                  background_active = 'textures/button/'
-                                                      'picker_left_active.png')
+                                  background_normal =
+                                  'textures/button/picker_left.png',
+                                  background_disabled_normal =
+                                  'textures/button/picker_left.png',
+                                  background_active =
+                                  'textures/button/picker_left_active.png')
         self.minute = DateTextField(size_hint = (0.2, 1),
                                     prev = '00',
-                                    background_normal = 'textures/button/'
-                                                        'picker_mid.png',
-                                    background_disabled_normal = 'textures/button/'
-                                                                 'picker_mid.png',
-                                    background_active = 'textures/button/'
-                                                        'picker_mid_active.png',
+                                    background_normal =
+                                    'textures/button/picker_mid.png',
+                                    background_disabled_normal =
+                                    'textures/button/picker_mid.png',
+                                    background_active =
+                                    'textures/button/picker_mid_active.png',
                                     font_size = 11)
         self.second = DateTextField(size_hint = (0.2, 1),
                                     prev = '00',
-                                    background_normal = 'textures/button/'
-                                                        'picker_right.png',
-                                    background_disabled_normal = 'textures/button/'
-                                                                 'picker_right.png',
-                                    background_active = 'textures/button/'
-                                                        'picker_right_active.png',
+                                    background_normal =
+                                    'textures/button/picker_right.png',
+                                    background_disabled_normal =
+                                    'textures/button/picker_right.png',
+                                    background_active =
+                                    'textures/button/picker_right_active.png',
                                     font_size = 11)
 
         self.add_widget(Widget(size_hint_x = 0.03))
@@ -1105,19 +1131,12 @@ class ExtendedDatePicker(DatePicker):
         self.add_widget(self.second)
 
 
-class HelpLabel(Label):
-    def __init__(self, **kwargs):
-        text = """"""
-        self.text = text
-        super().__init__(**kwargs)
-
-
 class ShowPswdButton(ToggleButton):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.size_hint = (0.4, 0.15)
         self.pos_hint = {"top": 0.16, "right": 0.4}
-        self.text = ' Show password'
+        self.text = ' ' + l['Show password']
         self.font_name = "fonts/NotoSans_R.ttf"
         self.background_color = (0, 0, 0, 0)
         self.color = (0.4, 0.4, 0.4, 1)
@@ -1135,11 +1154,11 @@ class RegScreen(Screen):
 
     def toggle_psw(self, state):
         if state == 'down':
-            self.show_psw.text = ' Hide password'
+            self.show_psw.text = ' ' + l['Hide password']
             self.tx_pass.password = False
             self.tx_con.password = False
         else:
-            self.show_psw.text = ' Show password'
+            self.show_psw.text = ' ' + l['Show password']
             self.tx_pass.password = True
             self.tx_con.password = True
 
@@ -1148,18 +1167,18 @@ class RegScreen(Screen):
         self.top_box = RegisterLayout(size_hint = (1, 0.125),
                                       pos_hint = {"top": 1})
 
-        self.lb_reg = RegLabel(text = "Register")
+        self.lb_reg = RegLabel(text = l['Register'])
 
         self.to_login = InputButton(size_hint = (0.25, 1),
                                     font_name = "fonts/NotoSans_R.ttf",
-                                    text = " Login",
+                                    text = ' ' + l['Login'],
                                     on_release = app.to_login,
                                     background_normal =
                                     'textures/button/menubt_normal.png')
 
         self.lb_usr = Label(size_hint = (0.28, 0.03),
                             pos_hint = {"top": 0.75, "right": 0.255},
-                            text = "Username",
+                            text = l['Username'],
                             color = (1, 1, 1, 1),
                             font_size = 16)
 
@@ -1169,7 +1188,7 @@ class RegScreen(Screen):
 
         self.lb_pass = Label(size_hint = (0.28, 0.03),
                              pos_hint = {"top": 0.54, "right": 0.25},
-                             text = "Password",
+                             text = l['Password'],
                              color = (1, 1, 1, 1),
                              font_size = 16)
 
@@ -1180,7 +1199,7 @@ class RegScreen(Screen):
 
         self.lb_con = Label(size_hint = (0.28, 0.03),
                             pos_hint = {"top": 0.33, "right": 0.235},
-                            text = "Confirm",
+                            text = l['Confirm'],
                             color = (1, 1, 1, 1),
                             font_size = 16)
 
@@ -1191,7 +1210,7 @@ class RegScreen(Screen):
 
         self.bt_next = Button(size_hint = (0.4, 0.15),
                               pos_hint = {"top": 0.15, "right": 0.94},
-                              text = "Next",
+                              text = l['Next'],
                               font_size = 16,
                               disabled = True,
                               background_normal =
@@ -1227,7 +1246,7 @@ class ErrorDisp(Popup):
         self.cont = FloatLayout()
         self.btn = Button(size_hint = (0.4, 0.2),
                      pos_hint = {"top": 0.163, "right": 0.94},
-                     text = "Back",
+                     text = l['Back'],
                      font_size = 15,
                      background_normal = "textures/button/normal_intro.png",
                      background_down = "textures/button/down_intro.png",
@@ -1242,7 +1261,7 @@ class ErrorDisp(Popup):
 
         self.cont.add_widget(self.lb)
         self.cont.add_widget(self.btn)
-        super().__init__(title = 'Error',
+        super().__init__(title = l['Error'],
                          content = self.cont,
                          height = 180,
                          **kwargs)
@@ -1271,7 +1290,21 @@ class LoggedAsLabel(Label):
 
 
 class MenuAddBar(BoxLayout):
-    pass
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        size_hint_x = 0.3 if app.language == 'English' else 0.4
+        self.plc = Widget(size_hint = (1 - size_hint_x, 1))
+        self.add_bt = Button(text = '[size=20][/size] ' + l['Add'],
+                             size_hint = (size_hint_x, 1),
+                             markup = True,
+                             font_name = 'fonts/NotoSans_B.ttf',
+                             font_size = 16,
+                             background_normal =
+                             'textures/button/menubt_normal.png',
+                             background_down =
+                             'textures/button/inputbt_down.png')
+        self.add_widget(self.plc)
+        self.add_widget(self.add_bt)
 
 
 class UsernameButton(Button):
@@ -1304,10 +1337,10 @@ class YesNoDialog(Popup):
         answers = BoxLayout(size_hint = (1, 0.3),
                                  spacing = 4,
                                  padding = 2)
-        yes = YesNoButton(text = " Yes",
+        yes = YesNoButton(text = ' ' + l['Yes'],
                           on_release = self.ch_yes)
 
-        no = YesNoButton(text = " No",
+        no = YesNoButton(text = ' ' + l['No'],
                          on_release = self.ch_no)
 
         box.add_widget(question_lb)
@@ -1322,8 +1355,8 @@ class YesNoDialog(Popup):
 
 class LogoutDialog(YesNoDialog):
     def __init__(self):
-        super().__init__(" Log out",
-                         "Do you want to log out?")
+        super().__init__(' ' + l['Log out'],
+                         l["Do you want to log out?"])
 
     def ch_yes(self, bt):
         self.dismiss()
@@ -1332,9 +1365,9 @@ class LogoutDialog(YesNoDialog):
 
 class DeleteProfileDialog(YesNoDialog):
     def __init__(self):
-        super().__init__(" Delete profile",
-                         "Are you sure you want\nto delete your profile?\n"
-                         "This action can't be undone")
+        super().__init__(' ' + l['Delete profile'],
+                         l['Are you sure you want\nto delete your profile?\n'
+                           'This action can\'t be undone'])
 
     def ch_yes(self, bt):
         self.dismiss()
@@ -1346,7 +1379,7 @@ class InfoBox(FloatLayout):
         super().__init__(**kwargs)
         with self.canvas:
             self.avatar = Ellipse(size = (105, 105),
-                                  pos = (5, 250))
+                                  pos = (46, 250))
         self.logged_as_lb = LoggedAsLabel(size_hint = (1, 0.25),
                                           pos_hint = {"top": 1},
                                           font_size = 13,
@@ -1396,27 +1429,28 @@ class MenuScreen(Screen):
                                    orientation = "vertical")
         self.divider = MenuDivider(size_hint = (0.01, 1))
 
-        self.menu_label = RegLabel(text = "Menu",
+        self.menu_label = RegLabel(text = l['Menu'],
                                    size_hint = (1, 0.07),
                                    font_size = 17)
 
         self.info_box = InfoBox(size_hint = (1, 0.3))
 
-        self.profile_bt = MenuButton(text = ('', "Profile"),
-                                     num = (13, 13),
+        diff = 0 if app.language == 'English' else 4
+        self.profile_bt = MenuButton(text = ('', l['Profile']),
+                                     num = (13 - diff, 13 - diff),
                                      on_release = app.to_self_profile)
 
         self.logout_dlg = LogoutDialog()
-        self.logout_bt = MenuButton(text = ('', 'Log out'),
+        self.logout_bt = MenuButton(text = ('', l['Log out']),
                                     num = (12, 12),
                                     on_release = self.logout_dlg.open)
 
-        self.settings_bt = MenuButton(text = ('', 'Settings'),
-                                      num = (11, 12),
+        self.settings_bt = MenuButton(text = ('', l['Settings']),
+                                      num = (11 - diff, 12 - diff),
                                       on_release = app.to_settings)
 
-        self.help_bt = MenuButton(text = ('', 'Help'),
-                                  num = (15, 15),
+        self.help_bt = MenuButton(text = ('', l['Help']),
+                                  num = (15 - diff - 1, 15 - diff - 1),
                                   on_release = app.to_help)
 
         self.add_bar = MenuAddBar(size_hint = (1, 0.105))
@@ -1430,16 +1464,15 @@ class MenuScreen(Screen):
                                      size_hint_y = None)
         self.users_disp.bind(minimum_height = self.users_disp.setter('height'))
 
-        self.add_button = self.add_bar.ids['add_bt']
         self.add_person_popup = AddPersonPopup()
-        self.add_button.on_press = self.add_person_popup.open
+        self.add_bar.add_bt.on_press = self.add_person_popup.open
 
-        self.div_favs = RecordDivider(text = "favorites")
-        self.div_requests = RecordDivider(text = "add requests")
-        self.div_online = RecordDivider(text = "online")
-        self.div_offline = RecordDivider(text = "offline")
-        self.div_req_sent = RecordDivider(text = "request sent")
-        self.div_blacklist = RecordDivider(text = "blacklisted")
+        self.div_favs = RecordDivider(text = l["favorites"])
+        self.div_requests = RecordDivider(text = l["add requests"])
+        self.div_online = RecordDivider(text = l["online"])
+        self.div_offline = RecordDivider(text = l["offline"])
+        self.div_req_sent = RecordDivider(text = l["request sent"])
+        self.div_blacklist = RecordDivider(text = l["blacklisted"])
 
         self.add_widget(self.container)
 
@@ -1544,16 +1577,16 @@ class FavRecord(UserRecord):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.profile = OptButton(self,
-                                 text = "Profile",
+                                 text = l['Profile'],
                                  on_press = self.f_to_profile)
         self.remove_favs = OptButton(self,
-                                     text = "Remove from favorites",
+                                     text = l["Remove from favorites"],
                                      on_press = self.f_remove_favs)
         self.remove_friends = OptButton(self,
-                                        text = "Remove from friends",
+                                        text = l["Remove from friends"],
                                         on_press = self.f_remove_friends)
         self.add_bl = OptButton(self,
-                                text = "Add to blacklist",
+                                text = l["Add to blacklist"],
                                 on_press = self.f_add_bl)
 
         self.opts.add_widget(self.profile)
@@ -1566,16 +1599,16 @@ class FriendRecord(UserRecord):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.profile = OptButton(self,
-                                 text = "Profile",
+                                 text = l["Profile"],
                                  on_press = self.f_to_profile)
         self.add_favs = OptButton(self,
-                                  text = "Add to favorites",
+                                  text = l["Add to favorites"],
                                   on_press = self.f_add_favs)
         self.remove_friends = OptButton(self,
-                                        text = "Remove from friends",
+                                        text = l["Remove from friends"],
                                         on_press = self.f_remove_friends)
         self.add_bl = OptButton(self,
-                                text = "Add to blacklist",
+                                text = l["Add to blacklist"],
                                 on_press = self.f_add_bl)
 
         self.opts.add_widget(self.profile)
@@ -1589,16 +1622,16 @@ class RequestGotRecord(UserRecord):
         super().__init__(*args, action = self._nop, **kwargs)
 
         self.profile = OptButton(self,
-                                 text = "Profile",
+                                 text = l["Profile"],
                                  on_press = self.f_to_profile)
         self.request_msg = OptButton(self,
-                                     text = "Request message",
+                                     text = l["Request message"],
                                      on_press = self.f_get_request_msg)
         self.accept = OptButton(self,
-                                text = "Accept",
+                                text = l["Accept"],
                                 on_press = self.f_accept_request)
         self.decline = OptButton(self,
-                                 text = "Decline",
+                                 text = l["Decline"],
                                  on_press = self.f_decline_request)
 
         self.opts.add_widget(self.profile)
@@ -1612,7 +1645,7 @@ class RequestSentRecord(UserRecord):
         super().__init__(*args, action = self._nop, **kwargs)
 
         self.take_back = OptButton(self,
-                                   text = "Take back",
+                                   text = l["Take back"],
                                    on_press = self.f_take_request_back)
 
         self.opts.add_widget(self.take_back)
@@ -1622,10 +1655,10 @@ class BlacklistRecord(UserRecord):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.profile = OptButton(self,
-                                 text = "Profile",
+                                 text = l["Profile"],
                                  on_press = self.f_to_profile)
         self.remove_bl = OptButton(self,
-                                   text = "Remove from blacklist",
+                                   text = l["Remove from blacklist"],
                                    on_press = self.f_remove_bl)
 
         self.opts.add_widget(self.profile)
@@ -1656,10 +1689,10 @@ class SearchRecord(UserRecord):
         self.popup = popup
         self.popup.msg_confirm.on_release = self.f_send_request
         self.profile = OptButton(self,
-                                 text = "Profile",
+                                 text = l['Profile'],
                                  on_press = self.f_to_profile)
         self.send_req = OptButton(self,
-                                  text = "Send add request",
+                                  text = l["Send add request"],
                                   on_press = self.f_ask_msg)
 
         self.opts.add_widget(self.profile)
@@ -1675,10 +1708,10 @@ class LoginScreen(Screen):
 
     def toggle_psw(self, state):
         if state == 'down':
-            self.show_psw.text = ' Hide password'
+            self.show_psw.text = ' ' + l['Hide password']
             self.tx_pass.password = False
         else:
-            self.show_psw.text = ' Show password'
+            self.show_psw.text = ' ' + l['Show password']
             self.tx_pass.password = True
 
     def __init__(self, **kwargs):
@@ -1686,11 +1719,12 @@ class LoginScreen(Screen):
         self.top_box = LoginLayout(size_hint = (1, 0.15),
                                    pos_hint = {"top": 1})
 
-        self.lb_log = RegLabel(text = "Login")
+        self.lb_log = RegLabel(text = l['Login'])
 
-        self.to_register = InputButton(size_hint = (0.25, 1),
+        self.to_register = InputButton(size_hint = (0.37, 1),
                                        font_name = "fonts/NotoSans_R.ttf",
-                                       text = "[size=18][/size] Register",
+                                       text = '[size=18][/size] ' +
+                                              l['Register'],
                                        markup = True,
                                        on_release = app.to_register,
                                        background_normal =
@@ -1698,7 +1732,7 @@ class LoginScreen(Screen):
 
         self.lb_usr = Label(size_hint = (0.28, 0.03),
                             pos_hint = {"top": 0.67, "right": 0.255},
-                            text = "Username",
+                            text = l['Username'],
                             color = (1, 1, 1, 1),
                             font_size = 16)
 
@@ -1708,7 +1742,7 @@ class LoginScreen(Screen):
 
         self.lb_pass = Label(size_hint = (0.28, 0.03),
                              pos_hint = {"top": 0.42, "right": 0.25},
-                             text = "Password",
+                             text = l['Password'],
                              color = (1, 1, 1, 1),
                              font_size = 16)
 
@@ -1719,12 +1753,15 @@ class LoginScreen(Screen):
 
         self.bt_next = Button(size_hint = (0.4, 0.18),
                               pos_hint = {"top": 0.185, "right": 0.94},
-                              text = "Next",
+                              text = l['Next'],
                               font_size = 16,
                               disabled = True,
-                              background_normal = "textures/button/normal_intro.png",
-                              background_down = "textures/button/down_intro.png",
-                              background_disabled_normal = "textures/button/disabled_intro.png",
+                              background_normal =
+                              "textures/button/normal_intro.png",
+                              background_down =
+                              "textures/button/down_intro.png",
+                              background_disabled_normal =
+                              "textures/button/disabled_intro.png",
                               on_release = app.login)
 
         self.show_psw = ShowPswdButton()
@@ -1776,7 +1813,7 @@ class SettingsLang(Button):
         self.options = ['English', 'Русский']
         self.text = app.language
         self.background_color = (0, 0, 0, 0)
-        self.selector = Popup(title = 'Select a language',
+        self.selector = Popup(title = l['Select a language'],
                               size = (200, 250))
         self.selector.content = BoxLayout(orientation = 'vertical',
                                           padding = 10,
@@ -1788,7 +1825,7 @@ class SettingsLang(Button):
 
         self.selector.content.add_widget(Widget(size_hint = (1, 0.1)))
 
-        self.cancel = Button(text = 'Cancel',
+        self.cancel = Button(text = l['Cancel'],
                              on_release = self.selector.dismiss)
         self.selector.content.add_widget(self.cancel)
 
@@ -1803,10 +1840,10 @@ class SettingsTheme(Button):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.options = ['Blue (default)']
-        self.text = app.theme_name
+        self.options = [l['Blue (default)']]
+        self.text = l[app.theme_name]
         self.background_color = (0, 0, 0, 0)
-        self.selector = Popup(title = 'Select a theme',
+        self.selector = Popup(title = l['Select a theme'],
                               size = (200, 250))
         self.selector.content = BoxLayout(orientation = 'vertical',
                                           padding = 10,
@@ -1818,29 +1855,18 @@ class SettingsTheme(Button):
 
         self.selector.content.add_widget(Widget(size_hint = (1, 0.1)))
 
-        self.cancel = Button(text = 'Cancel',
+        self.cancel = Button(text = l['Cancel'],
                              on_release = self.selector.dismiss)
         self.selector.content.add_widget(self.cancel)
 
 
-class SettingsBar(BoxLayout):
+class BackBar(BoxLayout):
     def to_menu(self, bt):
-        sets = {'lang': app.language,
-                'thm': app.theme_name}
-        smiles = self.parent.smile_grid.children
-        for sm in smiles:
-            sets[str(sm.num)] = sm.text
-
-        with open('settings', 'w') as f:
-            json.dump(sets, f, ensure_ascii = False, indent = 2)
-
-        app.settings = sets
-
         app.to_menu()
 
-    def __init__(self, **kwargs):
+    def __init__(self, title, **kwargs):
         super().__init__(**kwargs)
-        self.back_bt = Button(text = "  Back",
+        self.back_bt = Button(text = '  ' + l['Back'],
                               size_hint = (0.15, 1),
                               font_name = 'fonts/NotoSans_B.ttf',
                               background_normal = 'textures/button/'
@@ -1850,19 +1876,38 @@ class SettingsBar(BoxLayout):
                               on_release = self.to_menu)
 
         self.title = Button(disabled = True,
-                            background_disabled_normal = 'textures/button/'
-                                                         'menubt_normal.png',
+                            background_disabled_normal =
+                            'textures/button/menubt_normal.png',
                             size_hint = (0.7, 1),
-                            text = "Settings",
+                            text = title,
                             font_name = 'fonts/NotoSans_B.ttf')
         self.plc = Button(disabled = True,
-                          background_disabled_normal = 'textures/button/'
-                                                       'menubt_normal.png',
+                          background_disabled_normal =
+                          'textures/button/menubt_normal.png',
                           size_hint = (0.15, 1))
 
         self.add_widget(self.back_bt)
         self.add_widget(self.title)
         self.add_widget(self.plc)
+
+
+class SettingsBar(BackBar):
+    def to_menu(self, bt):
+        sets = {'lang': app.language,
+                'thm': app.theme_name}
+        smiles = self.parent.smile_grid.children
+        for sm in smiles:
+            sets[str(sm.num)] = sm.text
+
+        with open('settings.json', 'w') as f:
+            json.dump(sets, f, ensure_ascii = False, indent = 2)
+
+        app.settings = sets
+
+        app.to_menu()
+
+    def __init__(self, **kwargs):
+        super().__init__(l['Settings'], **kwargs)
 
 
 class SmileInput(MessageInput):
@@ -1885,22 +1930,23 @@ class SettingsScreen(Screen):
         self.bar = SettingsBar(size_hint = (1, 0.1),
                                pos_hint = {"top": 1})
 
-        self.lang = SettingsItem(title = 'Language',
+        self.lang = SettingsItem(title = l['Language'],
                                  changer = SettingsLang,
                                  pos = (0, 350),
                                  size = (500, 40))
 
-        self.thm = SettingsItem(title = 'UI Theme',
+        self.thm = SettingsItem(title = l['UI Theme'],
                                 changer = SettingsTheme,
                                 pos = (0, 300),
                                 size = (500, 40))
 
-        self.smile_lb = Button(text = 'Custom smiles:',
+        width = 150 if app.language == 'English' else 220
+        self.smile_lb = Button(text = l['Custom smiles:'],
                                size_hint = (None, None),
                                disabled = True,
                                background_disabled_normal =
                                'textures/button/normal.png',
-                               size = (150, 30),
+                               size = (width, 30),
                                pos_hint = {"center_x": 0.5, "top": 0.63})
 
         self.smile_grid = GridLayout(size_hint = (None, None),
@@ -1909,17 +1955,6 @@ class SettingsScreen(Screen):
                                      spacing = 20,
                                      cols = 5,
                                      rows = 2)
-
-        self.restart_warn = Button(text = 'If you change any of these settings'
-                                          ', you should restart the app for'
-                                          ' them to take effect',
-                                   pos = (0, 10),
-                                   size = (500, 20),
-                                   disabled = True,
-                                   background_disabled_normal =
-                                   'textures/button/menubt_normal.png',
-                                   size_hint = (None, None),
-                                   font_size = 12)
 
         for i in range(10):
             tx = SmileInput(i)
@@ -1931,7 +1966,6 @@ class SettingsScreen(Screen):
         self.add_widget(self.thm)
         self.add_widget(self.smile_lb)
         self.add_widget(self.smile_grid)
-        self.add_widget(self.restart_warn)
 
 
 class SearchInput(MessageInput):
@@ -1959,7 +1993,7 @@ class AddPersonPopup(Popup):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.title = 'Add a user'
+        self.title = l['Add a user']
         self.size_hint = (None, None)
         self.size = 400, 350
         self.keep_text = False
@@ -1967,7 +2001,7 @@ class AddPersonPopup(Popup):
                              spacing = 15,
                              padding = 10)
         self.tx_nick = SearchInput(self,
-                                   'Enter a username...',
+                                   l['Enter a username...'],
                                    size_hint = (1, 0.12),
                                    multiline = False,
                                    font_size = 13)
@@ -1982,19 +2016,22 @@ class AddPersonPopup(Popup):
         self.users_disp.bind(minimum_height = self.users_disp.setter('height'))
 
         self.msg_popup = Popup(height = 180,
-                               title = 'Message (optional)',
+                               title = l['Message (optional)'],
                                title_font = 'fonts/NotoSans_R.ttf')
         self.msg_cont = FloatLayout()
         self.msg_input = MessageInput('',
                                       size_hint = (0.98, 0.65),
                                       font_size = 13,
-                                      pos_hint = {"top": 0.95, "center_x": 0.5})
+                                      pos_hint =
+                                      {"top": 0.95, "center_x": 0.5})
         self.msg_confirm = Button(size_hint = (0.4, 0.25),
                                   pos_hint = {"top": 0.22, "right": 0.94},
-                                  text = "Confirm",
+                                  text = l['OK'],
                                   font_size = 15,
-                                  background_normal = "textures/button/normal_intro.png",
-                                  background_down = "textures/button/down_intro.png")
+                                  background_normal =
+                                  "textures/button/normal_intro.png",
+                                  background_down =
+                                  "textures/button/down_intro.png")
 
         self.msg_cont.add_widget(self.msg_input)
         self.msg_cont.add_widget(self.msg_confirm)
@@ -2012,9 +2049,9 @@ class MsgInfoPopup(Popup):
 
         self.info_view = InfoView()
 
-        self.height = 250
+        self.height = 270
         self.content = self.info_view
-        self.title = "Message Info"
+        self.title = l['Message Info']
 
 
 class DialogScreen(Screen):
@@ -2104,29 +2141,30 @@ class DialogButtonBar(BoxLayout):
         super().__init__(**kwargs)
         self.scr = scr
 
-        self.menu = DialogButton(text = ' Menu',
+        self.menu = DialogButton(text = ' ' + l['Menu'],
                                  halign = 'left',
-                                 size_hint = (0.19, 1),
+                                 size_hint = (0.2, 1),
                                  on_release = app.to_menu)
         self.plc = Button(background_disabled_normal =
                           'textures/button/menubt_normal.png',
                           disabled = True,
-                          size_hint = (0.35, 1))
+                          size_hint = (0.34, 1))
 
         self.opts_extender = BoxLayout(size_hint = (0.46, 1))
         self.opts_drop = DropDown()
-        self.opts = DialogButton(text = 'Options ',
+        self.opts = DialogButton(text = l['Options'] + ' ',
                                  halign = 'right',
                                  on_release = self.drop_open)
         self.opts_plc = Button(background_disabled_normal =
                                'textures/button/menubt_normal.png',
                                disabled = True)
 
-        self.load_bt = DialogOptButton('', ' Load older messages', 1,
+        off = 0 if app.language == 'English' else 3
+        self.load_bt = DialogOptButton('', l[' Load older messages'], 1 + off,
                                        on_release = scr.load_more)
-        self.search_bt = DialogOptButton('', 'Search for messages', 2,
+        self.search_bt = DialogOptButton('', l['Search for messages'], 2,
                                          on_release = self.search_msg)
-        self.delete_bt = DialogOptButton('', 'Delete dialog', 9,
+        self.delete_bt = DialogOptButton('  ', l['Delete dialog'], 9 - 2*off,
                                          on_release = app.delete_dialog)
 
         self.opts_drop.add_widget(self.load_bt)
@@ -2143,11 +2181,14 @@ class DialogButtonBar(BoxLayout):
 
 class SearchMsgButton(Button):
     def on_release(self):
+        self.cont.from_picker.update_date()
+        self.cont.to_picker.update_date()
+
         l_tm = self.cont.from_picker.timestamp
         u_tm = self.cont.to_picker.timestamp
         text = self.cont.text_to_search.text
         if l_tm > u_tm:
-            ErrorDisp('The end time exceeds the beginning.').open()
+            ErrorDisp(l['The beginning time exceeds the end']).open()
         else:
             msgs = app.search_message(self.cont.scr, text, l_tm, u_tm)
             self.cont.build_msgs(msgs)
@@ -2173,20 +2214,20 @@ class SearchMsgPopup(Popup):
 
     def __init__(self, scr, **kwargs):
         super().__init__(**kwargs)
-        self.title = "Search messages"
+        self.title = l['Search for messages']
         self.size = (300, 400)
         self.scr = scr
 
-        self.container = BoxLayout(orientation = "vertical",
-                                   padding = 10,
-                                   spacing = 10)
+        self.content = BoxLayout(orientation = "vertical",
+                                 padding = 10,
+                                 spacing = 10)
         self.from_box = BoxLayout(size_hint = (1, 0.1))
         self.to_box = BoxLayout(size_hint = (1, 0.1))
 
-        self.from_lb = Label(text = "From: ",
+        self.from_lb = Label(text = l['From: '],
                              size_hint = (0.2, 1),
                              color = (1, 1, 1, 1))
-        self.to_lb = Label(text = "To: ",
+        self.to_lb = Label(text = l['To: '],
                            size_hint = (0.2, 1),
                            color = (1, 1, 1, 1))
         self.from_picker = ExtendedDatePicker()
@@ -2198,10 +2239,10 @@ class SearchMsgPopup(Popup):
         self.to_box.add_widget(self.to_picker)
 
         self.src_button = SearchMsgButton(self,
-                                          text = " Search",
+                                          text = ' ' + l['Search'],
                                           size_hint = (1, 0.1))
 
-        self.text_to_search = MessageInput("Text to search...",
+        self.text_to_search = MessageInput(l["Text to search..."],
                                            size_hint = (1, 0.3),
                                            font_size = 13)
 
@@ -2218,13 +2259,11 @@ class SearchMsgPopup(Popup):
 
         self.msg_layout.add_widget(self.msg_grid)
 
-        self.container.add_widget(self.from_box)
-        self.container.add_widget(self.to_box)
-        self.container.add_widget(self.text_to_search)
-        self.container.add_widget(self.src_button)
-        self.container.add_widget(self.msg_layout)
-
-        self.content = self.container
+        self.content.add_widget(self.from_box)
+        self.content.add_widget(self.to_box)
+        self.content.add_widget(self.text_to_search)
+        self.content.add_widget(self.src_button)
+        self.content.add_widget(self.msg_layout)
 
 
 class DialogStatusBar(BoxLayout):
@@ -2242,7 +2281,6 @@ class DialogStatusBar(BoxLayout):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
 
         self.self_name = NickLabel(halign = "right",
                                    on_release = app.to_self_profile)
@@ -2323,7 +2361,7 @@ class DialogInputBar(BoxLayout):
 
         self.input_panel = InputBox(size_hint = (0.9, 1))
 
-        self.msg_input = MessageInput('Your message here...',
+        self.msg_input = MessageInput(l['Your message here...'],
                                       font_size = 13)
 
         self.bt_send = InputButton(size_hint = (1, 0.35),
@@ -2359,14 +2397,14 @@ class ProfileData:
 
 class ChatApp(App):
     nick_ptrn = re.compile('(?![ ]+)[\w ]{2,15}')
-    invalid_nick = ('The username you entered is incorrect. '
-                    'It should only consist of letters and spaces, '
-                    'it cannot consist of spaces only and must be '
-                    '2 to 15 characters long')
-    nick_taken = ('There is already a user with the username you entered. '
-                  'Try something different')
-    wrong_pswd = ('You entered a wrong password for this username. '
-                  'Try again')
+    invalid_nick = l['The username you entered is incorrect. '
+                     'It should only consist of letters and spaces, '
+                     'it cannot consist of spaces only and must be '
+                     '2 to 15 characters long']
+    nick_taken = l['There is already a user with the username you entered. '
+                   'Try something different']
+    wrong_pswd = l['You entered a wrong password for this username. '
+                   'Try again']
     users = [[('user1', True),
               ('user7', False)],
              [('user2', False)],
@@ -2377,7 +2415,7 @@ class ChatApp(App):
     profiles = {}
     msg_amount = 50
     language = StringProperty('English')
-    theme_name = StringProperty('Blue (default)')
+    theme_name = StringProperty(l['Blue (default)'])
 
     def back_to_search(self, bt = None):
         self.screens.current = 'menu'
@@ -2440,7 +2478,7 @@ class ChatApp(App):
         self.screens.current = 'settings'
 
     def to_help(self, bt = None):
-        pass
+        self.screens.current = 'help'
 
     def to_dialog(self, bt):
         Window.size = (350, 500)
@@ -2507,12 +2545,12 @@ class ChatApp(App):
 
         'register'
         self.nick = self.register_scr.tx_usr.text
-        self.menu_scr.info_box.logged_as_lb.text = "Logged in as\n" + self.nick
+        info_box = self.menu_scr.info_box
+        info_box.logged_as_lb.text = l["Logged in as\n"] + self.nick
 
         self.get_profile_info(self.nick)
 
-        self.menu_scr.info_box.avatar.source = ('textures/panels/'
-                                                'avatar_placeholder.png')
+        info_box.avatar.source = 'textures/panels/avatar_placeholder.png'
 
         self.get_user_groups()
 
@@ -2525,13 +2563,14 @@ class ChatApp(App):
         'login'
 
         self.nick = self.login_scr.tx_usr.text
-        self.menu_scr.info_box.logged_as_lb.text = "Logged in as\n" + self.nick
+        info_box = self.menu_scr.info_box
+        info_box.logged_as_lb.text = l["Logged in as\n"] + self.nick
 
         self.get_profile_info(self.nick)
 
         profile = self.profiles[self.nick]
 
-        self.menu_scr.info_box.avatar.source = profile.image_name
+        info_box.avatar.source = profile.image_name
 
         self.get_user_groups()
 
@@ -2574,7 +2613,7 @@ class ChatApp(App):
     def delete_profile(self):
         'delete_profile'
         self.profiles.pop(self.nick)
-        self.to_login()
+        self.logout()
 
     def get_message_history(self, num):
         'get_message_history'
@@ -2583,37 +2622,15 @@ class ChatApp(App):
             history.append((str(i), 1000000, self.nick))
         return history
 
-    def on_stop(self):
-        for i in os.scandir('temp'):
-            os.remove(i.path)
-        os.rmdir('temp')
-
     def open_settings(self):
         pass
-
-    def get_settings(self):
-        if not os.path.exists('settings'):
-            sets = {'lang': self.language,
-                    'thm': self.theme_name}
-            for i in range(10):
-                sets[str(i)] = ''
-
-            with open('settings', 'w') as f:
-                json.dump(sets, f,
-                          ensure_ascii = False,
-                          indent = 2,
-                          sort_keys = True)
-            return sets
-
-        with open('settings') as f:
-            return json.load(f)
 
     def build(self):
         Window.clearcolor = (0.71, 0.85, 1, 1)
         self.nick = ''
         self.person = ''
 
-        self.settings = self.get_settings()
+        self.settings = _get_settings()
 
         self.language = self.settings['lang']
         self.theme_name = self.settings['thm']
@@ -2632,6 +2649,7 @@ class ChatApp(App):
         self.self_profile_scr = SelfProfile(name = "self_profile")
         self.profile_scr = Profile(name = "profile")
         self.settings_scr = SettingsScreen(name = "settings")
+        self.help_scr = HelpScreen(name = "help")
 
         self.screens.add_widget(self.login_scr)
         self.screens.add_widget(self.register_scr)
@@ -2639,6 +2657,7 @@ class ChatApp(App):
         self.screens.add_widget(self.self_profile_scr)
         self.screens.add_widget(self.profile_scr)
         self.screens.add_widget(self.settings_scr)
+        self.screens.add_widget(self.help_scr)
         inspector.create_inspector(Window, self.screens)
         return self.screens
 
