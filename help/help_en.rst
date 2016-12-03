@@ -72,7 +72,7 @@ In this section, you can select a language and a theme, as well as create custom
 
 **User search**
 ---------------
-To add new friends, you need to press the [font=fonts/NotoSans_RI.ttf]Add[/font] button in the menu and enter a username in a popup. Then you can either view a user's profile or send an add request.
+To add new friends, you need to press the [font=fonts/NotoSans_RI.ttf]Add[/font] button in the menu and enter a username in a popup. Then you can send that user an add request.
 
 You can only send messages to a user after he accepts your request. You can send one optional message with the request.
 

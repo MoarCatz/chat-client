@@ -1719,11 +1719,6 @@ class BlacklistRecord(UserRecord):
 
 
 class SearchRecord(UserRecord):
-    def f_to_profile(self, bt):
-        self.opts.dismiss()
-        nick = bt.record.name.text
-        app.to_profile(nick, 'search')
-
     def f_ask_msg(self, bt):
         self.opts.dismiss()
         self.popup.msg_popup.open()
@@ -1741,14 +1736,10 @@ class SearchRecord(UserRecord):
         super().__init__(*args, **kwargs)
         self.popup = popup
         self.popup.msg_confirm.on_release = self.f_send_request
-        self.profile = OptButton(self,
-                                 text = l['Profile'],
-                                 on_press = self.f_to_profile)
         self.send_req = OptButton(self,
                                   text = l["Send add request"],
                                   on_press = self.f_ask_msg)
 
-        self.opts.add_widget(self.profile)
         self.opts.add_widget(self.send_req)
         self.name.disabled = True
 
