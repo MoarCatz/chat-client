@@ -112,7 +112,8 @@ lcl = {'Sender': 'Отправитель',
        'Вы вошли как\n',
        'Help': 'Справка',
        'Name': 'Имя',
-       'Size': 'Размер'}
+       'Size': 'Размер',
+       'About': 'О программе'}
 
 with open('local_ru.json', 'w') as f:
     json.dump(lcl, f, ensure_ascii = False, sort_keys = True, indent = 2)

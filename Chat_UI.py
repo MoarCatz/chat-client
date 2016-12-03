@@ -6,7 +6,7 @@ Config.set('graphics', 'width', 370)
 Config.set('graphics', 'height', 200)
 Config.set('graphics', 'resizable', False)
 
-import string, re, os, json
+import string, re, os, json, webbrowser
 from datetime import datetime
 import time
 from functools import partial
@@ -42,6 +42,7 @@ from kivy.uix.image import Image
 from kivy.base import stopTouchApp
 from kivy.uix.filechooser import FileChooserListView, FileSystemLocal
 from kivy.uix.tabbedpanel import TabbedPanel, TabbedPanelHeader
+from kivy.uix.rst import RstDocument
 
 # For debugging purposes, will be removed
 from kivy.modules import inspector
@@ -50,7 +51,6 @@ from kivy.modules import inspector
 Builder.load_string('''
 <Label>:
     font_name: "fonts/NotoSans_R.ttf"
-    halign: "center"
 
 <Button>:
     color: 1, 1, 1, 1
@@ -415,20 +415,72 @@ class HelpPage(TabbedPanelHeader):
         super().__init__(**kwargs)
         self.background_normal = 'textures/button/tab.png'
         self.background_down = 'textures/button/tab_active.png'
+        self.color = (0, 0, 0, 1)
+        self.font_size = 11
 
+
+class LinkButton(Button):
+    def on_press(self):
+        webbrowser.open(self.link)
+
+    def __init__(self, link, **kwargs):
+        super().__init__(**kwargs)
+        self.link = link
+        self.background_color = (0, 0, 0, 0)
 
 class HelpScreen(Screen):
+    def place_links(self, tm):
+        # This method goes deep into the structure of an RstDocument widget
+        rst = self.about_page.content
+        rst_elems = rst.children[0].children[0].children
+
+        rst_list = rst_elems[5]
+        team = rst_elems[1]
+
+        rst_list.add_widget(self.server_link)
+        rst_list.add_widget(self.client_link)
+        team.add_widget(self.team_link)
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.cont = BoxLayout(orientation = 'vertical')
         self.bar = BackBar(title = l['Help'],
                            size_hint = (1, 0.1))
-        self.tabs = TabbedPanel(tab_height = 20,
+
+        self.tabs = TabbedPanel(tab_height = 21,
                                 do_default_tab = False,
                                 tab_pos = 'bottom_left')
 
-        self.help_page = HelpPage()
-        self.about_page = HelpPage()
+        with self.tabs.canvas:
+            Color(rgba = (0, 0.58, 1, 1))
+            Rectangle(size = (500, 1),
+                      pos = (0, 22))
+
+        self.help_page = HelpPage(text = l['Help'])
+        self.about_page = HelpPage(text = l['About'])
+
+        link_width = 80 if app.language == 'English' else 52
+        url = 'https://github.com/MoarCatz/'
+        self.server_link = LinkButton(link = url + 'chat-server',
+                                      size = (link_width, 20),
+                                      pos = (30, 245))
+
+        self.client_link = LinkButton(link = url + 'chat-client',
+                                      size = (link_width, 20),
+                                      pos = (30, 214))
+
+        team_x = 200 if app.language == 'English' else 310
+        self.team_link = LinkButton(link = url,
+                                    size = (68, 20),
+                                    pos = (team_x, 93))
+
+        self.tabs.switch_to(self.help_page)
+
+        suff = '_en.rst' if app.language == 'English' else '_ru.rst'
+        self.help_page.content = RstDocument(source = 'help/help' + suff,
+                                             background_color = (1, 1, 1, 1))
+        self.about_page.content = RstDocument(source = 'help/about' + suff,
+                                              background_color = (1, 1, 1, 1))
 
         self.tabs.add_widget(self.help_page)
         self.tabs.add_widget(self.about_page)
@@ -438,6 +490,7 @@ class HelpScreen(Screen):
         self.cont.add_widget(self.tabs)
 
         self.add_widget(self.cont)
+        Clock.schedule_once(self.place_links, 0.001)
 
 
 class SmileButton(Button):
