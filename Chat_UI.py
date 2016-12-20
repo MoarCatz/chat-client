@@ -9,9 +9,10 @@ Config.set('graphics', 'resizable', False)
 import string, re, os, json, webbrowser
 from datetime import datetime
 import time
-from functools import partial
 from PIL import Image as _Image
 from textwrap import TextWrapper
+from threading import Thread
+from io import BytesIO
 
 from kivy.app import App
 from kivy.lang import Builder
@@ -39,13 +40,16 @@ from kivy.uix.spinner import Spinner, SpinnerOption
 from kivy.clock import Clock
 from kivy.graphics import Ellipse, Color, Rectangle
 from kivy.uix.image import Image
-from kivy.base import stopTouchApp
+from kivy.core.image import Image as CoreImage
+from kivy.base import stopTouchApp, EventLoop
 from kivy.uix.filechooser import FileChooserListView, FileSystemLocal
 from kivy.uix.tabbedpanel import TabbedPanel, TabbedPanelHeader
 from kivy.uix.rst import RstDocument
 
 # For debugging purposes, will be removed
 from kivy.modules import inspector
+
+from client import RequestSender
 
 
 Builder.load_string('''
@@ -255,7 +259,6 @@ Builder.load_string('''
 <ProfileButton>:
     background_normal: 'textures/button/normal.png'
     background_down: 'textures/button/down.png'
-    background_disabled_normal: 'textures/button/disabled.png'
     font_name: 'fonts/NotoSans_B.ttf'
     size: 145, 40
     size_hint: None, None
@@ -360,7 +363,6 @@ Builder.load_string('''
 <YesNoButton>:
     background_normal: 'textures/button/normal.png'
     background_down: 'textures/button/down.png'
-    background_disabled_normal: 'textures/button/disabled.png'
     font_name: 'fonts/NotoSans_B.ttf'
 ''')
 
@@ -724,7 +726,9 @@ class Profile(Screen):
         page.email_field.text = profile_data.email
         page.birthday_field.update_selectors(profile_data.bday)
         page.about_field.text = profile_data.about
-        page.avatar.source = profile_data.image_name
+        page.avatar_texture = CoreImage(BytesIO(profile_data.image_data,
+                                                ext = 'png'))
+        page.avatar.texture = page.avatar_texture.texture
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -786,7 +790,7 @@ class ImageOnlyFileSystem(FileSystemLocal):
                     yield i.name
                 else:
                     ext = i.name.lower()[-4:]
-                    if ext == '.png' or ext == '.jpg':
+                    if ext == '.png':
                         yield i.name
         except PermissionError as e:
             # strip the '[errno N]' part
@@ -806,14 +810,22 @@ class AvatarSelectButton(Button):
 
 
 class AvatarSelectDialog(Popup):
-    wrong_ext = l['The selected file should be a PNG or a JPG image']
+    wrong_ext = l['The selected file should be a PNG image']
     def set_image(self, bt):
         file = self.file_select.selection
         if file:
-            if not file[0].endswith('.png') and not file[0].endswith('.jpg'):
+            if not file[0].endswith('.png'):
                 ErrorDisp(self.wrong_ext).open()
                 return
-            self.cont.avatar.source = file[0]
+            with open(file[0], 'rb') as f:
+                img = f.read()
+            id_match = app.set_image(img)
+            if not id_match:
+                return
+            profile_data = app.profiles[self.cont.nick_field.text]
+            profile_data.image_data = img
+            self.cont.avatar_texture = CoreImage(BytesIO(img), ext = 'png')
+            self.cont.avatar.texture = self.cont.avatar_texture.texture
             self.dismiss()
         else:
             ErrorDisp(l['Please, select a file']).open()
@@ -865,28 +877,27 @@ class ProfilePage(FloatLayout):
             profile_data = app.profiles[self.nick_field.text]
             status = self.status_field.text
             if profile_data.status != status:
-                app.change_profile_section('status', status)
-                profile_data.status = status
+                success = app.change_profile_section('status', status)
+                if success:
+                    profile_data.status = status
 
             email = self.email_field.text
             if profile_data.email != email:
-                app.change_profile_section('email', email)
-                profile_data.email = email
+                success = app.change_profile_section('email', email)
+                if success:
+                    profile_data.email = email
 
             bday = self.birthday_field.timestamp
             if profile_data.bday != bday:
-                app.change_profile_section('birthday', bday)
-                profile_data.bday = bday
+                success = app.change_profile_section('birthday', bday)
+                if success:
+                    profile_data.bday = bday
 
             about = self.about_field.text
             if profile_data.about != about:
-                app.change_profile_section('about', about)
-                profile_data.about = about
-
-            image_name = self.avatar.source
-            if profile_data.image_name != image_name:
-                app.set_image(image_name)
-                profile_data.image_name = image_name
+                success = app.change_profile_section('about', about)
+                if success:
+                    profile_data.about = about
         self.editing = not self.editing
 
     def __init__(self, **kwargs):
@@ -897,8 +908,10 @@ class ProfilePage(FloatLayout):
                     size = (102, 102))
 
             Color(rgba = (1, 1, 1, 1))
+            self.avatar_texture = None
             self.avatar = Ellipse(pos = (10, 360),
                                   size = (100, 100))
+
 
         self.file_chooser = AvatarSelectDialog(self)
 
@@ -1295,29 +1308,29 @@ class ErrorLabel(Label):
 
 
 class ErrorDisp(Popup):
-    def __init__(self, text, **kwargs):
-        self.cont = FloatLayout()
+    def __init__(self, text = '', **kwargs):
+        super().__init__(**kwargs)
+        self.content = FloatLayout()
         self.btn = Button(size_hint = (0.4, 0.2),
-                     pos_hint = {"top": 0.163, "right": 0.94},
-                     text = l['Back'],
-                     font_size = 15,
-                     background_normal = "textures/button/normal_intro.png",
-                     background_down = "textures/button/down_intro.png",
-                     on_release = self.dismiss)
+                          pos_hint = {"top": 0.163, "right": 0.94},
+                          text = l['Back'],
+                          font_size = 15,
+                          background_normal =
+                          "textures/button/normal_intro.png",
+                          background_down = "textures/button/down_intro.png",
+                          on_release = self.dismiss)
         self.lb = ErrorLabel(text = text,
-                        font_size = 13,
-                        color = (1, 1, 1, 1),
-                        size_hint = (0.95, 0.8),
-                        pos_hint = {"top": 0.99, "center_x": 0.5},
-                        halign = "left",
-                        valign = "top")
+                             font_size = 13,
+                             color = (1, 1, 1, 1),
+                             size_hint = (0.95, 0.8),
+                             pos_hint = {"top": 0.99, "center_x": 0.5},
+                             halign = "left",
+                             valign = "top")
 
-        self.cont.add_widget(self.lb)
-        self.cont.add_widget(self.btn)
-        super().__init__(title = l['Error'],
-                         content = self.cont,
-                         height = 180,
-                         **kwargs)
+        self.content.add_widget(self.lb)
+        self.content.add_widget(self.btn)
+        self.title = l['Error']
+        self.height = 180
 
 
 class MenuButton(Button):
@@ -1431,6 +1444,7 @@ class InfoBox(FloatLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         with self.canvas:
+            self.avatar_texture = None
             self.avatar = Ellipse(size = (105, 105),
                                   pos = (46, 250))
         self.logged_as_lb = LoggedAsLabel(size_hint = (1, 0.25),
@@ -1452,8 +1466,8 @@ class MenuScreen(Screen):
 
         if users[1]:
             add(self.div_requests)
-        for name, online in users[1]:
-            add(RequestGotRecord(name, online))
+        for name, message, online in users[1]:
+            add(RequestGotRecord(name, online, msg = message))
 
         add(self.div_online)
         for name, online in users[2]:
@@ -1465,13 +1479,18 @@ class MenuScreen(Screen):
 
         if users[4]:
             add(self.div_req_sent)
-        for name, online in users[4]:
-            add(RequestSentRecord(name, online))
+        for name, message, online in users[4]:
+            add(RequestSentRecord(name, online, msg = message))
 
         if users[5]:
             add(self.div_blacklist)
         for name, online in users[5]:
             add(BlacklistRecord(name, online))
+
+    def initialize_search(self, bt):
+        user_list = app.get_search_list()
+        self.add_person_popup.user_list = user_list
+        self.add_person_popup.open()
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -1518,7 +1537,7 @@ class MenuScreen(Screen):
         self.users_disp.bind(minimum_height = self.users_disp.setter('height'))
 
         self.add_person_popup = AddPersonPopup()
-        self.add_bar.add_bt.on_press = self.add_person_popup.open
+        self.add_bar.add_bt.on_press = self.initialize_search
 
         self.div_favs = RecordDivider(text = l["favorites"])
         self.div_requests = RecordDivider(text = l["add requests"])
@@ -1545,34 +1564,41 @@ class MenuScreen(Screen):
         self.disp_scroll.add_widget(self.users_disp)
 
 
+class RequestMessage(ErrorDisp):
+    def __init__(self, message = '', **kwargs):
+        super().__init__(**kwargs)
+        self.title = l['Request Message']
+        self.lb.text = message
+
+
 class UserRecord(BoxLayout):
     def _nop(self, bt = None):
         pass
 
     def f_to_profile(self, bt):
         self.opts.dismiss()
-        nick = bt.record.name.text
+        nick = self.name.text
         app.to_profile(nick, 'menu')
 
     def f_remove_favs(self, bt):
         self.opts.dismiss()
-        app.remove_favs()
+        app.remove_favs(self.name.text)
 
     def f_remove_friends(self, bt):
         self.opts.dismiss()
-        app.remove_friends()
+        app.remove_friends(self.name.text)
 
     def f_add_bl(self, bt):
         self.opts.dismiss()
-        app.add_bl()
+        app.add_bl(self.name.text, self.status.online)
 
     def f_add_favs(self, bt):
         self.opts.dismiss()
-        app.add_favs()
+        app.add_favs(self.name.text, self.status.online)
 
     def f_get_request_msg(self, bt):
         self.opts.dismiss()
-        app.get_request_msg()
+        RequestMessage(self.message).open()
 
     def f_accept_request(self, bt):
         self.opts.dismiss()
@@ -1580,15 +1606,15 @@ class UserRecord(BoxLayout):
 
     def f_decline_request(self, bt):
         self.opts.dismiss()
-        app.decline_request()
+        app.decline_request(self.name.text)
 
     def f_take_request_back(self, bt):
         self.opts.dismiss()
-        app.take_request_back()
+        app.take_request_back(self.name.text)
 
     def f_remove_bl(self, bt):
         self.opts.dismiss()
-        app.remove_bl()
+        app.remove_bl(self.name.text)
 
     def more_action(self, bt):
         self.opts.open(self)
@@ -1671,9 +1697,9 @@ class FriendRecord(UserRecord):
 
 
 class RequestGotRecord(UserRecord):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, msg = '', *args, **kwargs):
         super().__init__(*args, action = self._nop, **kwargs)
-
+        self.message = msg
         self.profile = OptButton(self,
                                  text = l["Profile"],
                                  on_press = self.f_to_profile)
@@ -1694,14 +1720,19 @@ class RequestGotRecord(UserRecord):
 
 
 class RequestSentRecord(UserRecord):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, msg = '', **kwargs):
         super().__init__(*args, action = self._nop, **kwargs)
-
+        self.message = msg
         self.take_back = OptButton(self,
                                    text = l["Take back"],
                                    on_press = self.f_take_request_back)
 
+        self.request_msg = OptButton(self,
+                                     text = l["Request message"],
+                                     on_press = self.f_get_request_msg)
+
         self.opts.add_widget(self.take_back)
+        self.opts.add_widget(self.request_msg)
 
 
 class BlacklistRecord(UserRecord):
@@ -1727,7 +1758,10 @@ class SearchRecord(UserRecord):
         msg = self.popup.msg_input.text
         name = self.name.text
 
-        app.send_request(name, self.status.online, msg)
+        id_match = app.send_request(name, self.status.online, msg)
+        if not id_match:
+            return
+
         self.popup.msg_input.text = ''
         self.popup.msg_popup.dismiss()
         self.popup.dismiss()
@@ -2028,15 +2062,24 @@ class AddPersonPopup(Popup):
         self.users_disp.clear_widgets()
 
         add = self.users_disp.add_widget
-        for name, online in app.search_username(query):
+
+        for name, online in self.matches(query):
             add(SearchRecord(self, name, online))
 
     def on_dismiss(self):
         if not self.keep_text:
             self.tx_nick.text = ''
+        self.user_list = None
+
+    def matches(self, query):
+        if self.user_list is None:
+            return []
+
+        return [i for i in self.user_list if query in i[0]]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.user_list = None
         self.title = l['Add a user']
         self.size_hint = (None, None)
         self.size = 400, 350
@@ -2100,7 +2143,8 @@ class MsgInfoPopup(Popup):
 
 class DialogScreen(Screen):
     def load_more(self, bt):
-        msgs = app.get_message_history(self.msg_layout.loaded + app.msg_amount)
+        msgs = app.get_message_history(self.number,
+                                       self.msg_layout.loaded + app.msg_amount)
         self.msg_grid.clear_widgets()
 
         for message in msgs:
@@ -2108,7 +2152,8 @@ class DialogScreen(Screen):
             msg_row = MessageRow(text, tm, escape_markup(nick), self)
             self.msg_grid.add_widget(msg_row)
 
-    def __init__(self, **kwargs):
+    def __init__(self, number = -1, **kwargs):
+        self.number = number
         super().__init__(**kwargs)
 
         self.smiles = [':)', ':D', ':]', ':3', '=)', ':D',
@@ -2181,6 +2226,9 @@ class DialogButtonBar(BoxLayout):
         self.opts_drop.dismiss()
         SearchMsgPopup(self.scr).open()
 
+    def delete_dialog(self, bt):
+        app.delete_dialog(self.scr.number)
+
     def __init__(self, scr, **kwargs):
         super().__init__(**kwargs)
         self.scr = scr
@@ -2209,7 +2257,7 @@ class DialogButtonBar(BoxLayout):
         self.search_bt = DialogOptButton('', l['Search for messages'], 2,
                                          on_release = self.search_msg)
         self.delete_bt = DialogOptButton('  ', l['Delete dialog'], 9 - 2*off,
-                                         on_release = app.delete_dialog)
+                                         on_release = self.delete_dialog)
 
         self.opts_drop.add_widget(self.load_bt)
         self.opts_drop.add_widget(self.search_bt)
@@ -2234,7 +2282,7 @@ class SearchMsgButton(Button):
         if l_tm > u_tm:
             ErrorDisp(l['The beginning time exceeds the end']).open()
         else:
-            msgs = app.search_message(self.cont.scr, text, l_tm, u_tm)
+            msgs = app.search_message(self.cont.scr.number, text, l_tm, u_tm)
             self.cont.build_msgs(msgs)
 
     def __init__(self, cont, **kwargs):
@@ -2377,7 +2425,6 @@ class DialogInputBar(BoxLayout):
 
     def send_msg(self, bt):
         text = self.msg_input.text.strip('\n ')
-        self.msg_input.text = ''
         if text not in string.whitespace:
             self.add_msg(text, app.nick)
             self.auto_response(text.upper())
@@ -2389,6 +2436,13 @@ class DialogInputBar(BoxLayout):
         curr_time = int(time.time() * 100)
         if self.scr is None:
             self.scr = self.parent.parent
+
+        id_match = app.send_message(text, curr_time, self.scr.number)
+        if not id_match:
+            return
+
+        self.msg_input.text = ''
+
         msg_row = MessageRow(text, curr_time, escape_markup(nick), self.scr)
 
         self.scr.msg_grid.add_widget(msg_row)
@@ -2430,13 +2484,13 @@ class DialogInputBar(BoxLayout):
 
 
 class ProfileData:
-    def __init__(self, nick, status, bday, email, about, image_name):
+    def __init__(self, nick, status, bday, email, about, image_data):
         self.nick = nick
         self.status = status
         self.bday = bday
         self.email = email
         self.about = about
-        self.image_name = image_name
+        self.image_data = image_data
 
 
 class ChatApp(App):
@@ -2534,79 +2588,151 @@ class ChatApp(App):
 
         self.screens.current = self.person
 
-    def add_favs(self, bt = None):
-        print('add_favs')
+    def add_favs(self, name, status):
+        id_match = self.rs.add_to_favorites(name)
+        if not id_match:
+            return False
 
-    def remove_favs(self, bt = None):
-        print('remove_favs')
+        self.users[0].append((name, status))
+        self.menu_scr.build_usr_list(self.users)
 
-    def add_friends(self, bt = None):
-        print('add_friends')
+    def remove_favs(self, name):
+        id_match = self.rs.remove_from_favorites(name)
+        if not id_match:
+            return
 
-    def remove_friends(self, bt = None):
-        print('remove_friends')
+        for idx, el in enumerate(self.users[0]):
+            if el[0] == name:
+                self.users[0].pop(idx)
+                break
+        self.menu_scr.build_usr_list(self.users)
 
-    def add_bl(self, bt = None):
-        print('add_bl')
+    def remove_friends(self, name):
+        id_match = self.rs.delete_from_friends(name)
+        if not id_match:
+            return False
 
-    def remove_bl(self, bt = None):
-        print('remove_bl')
+        for user_list in (self.users[0], self.users[2], self.users[3]):
+            for idx, el in enumerate(user_list):
+                if el[0] == name:
+                    user_list.pop(idx)
+                    break
+        self.menu_scr.build_usr_list(self.users)
+        self.screens.remove_widget(self.screens.get_screen(name))
 
-    def get_request_msg(self, bt = None):
-        print('get_request_msg')
+    def add_bl(self, name, status):
+        id_match = self.rs.add_to_blacklist(name)
+        if not id_match:
+            return False
 
-    def accept_request(self, bt = None):
-        print('accept_request')
+        for user_list in self.users[:5]:
+            for idx, el in enumerate(user_list):
+                if el[0] == name:
+                    user_list.pop(idx)
+                    break
+        self.users[5].append((name, status))
+        self.menu_scr.build_usr_list(self.users)
 
-    def decline_request(self, bt = None):
-        print('decline_request')
+    def remove_bl(self, name):
+        id_match = self.rs.remove_from_blacklist(name)
+        if not id_match:
+            return False
 
-    def take_request_back(self, bt = None):
-        print('take_request_back')
+        for idx, el in enumerate(self.users[6]):
+            if el[0] == name:
+                self.users[6].pop(idx)
+                break
+        self.menu_scr.build_usr_list(self.users)
+
+    def accept_request(self, name):
+        id_match = self.rs.confirm_add_request(name)
+        if not id_match:
+            return False
+
+        id_match, self.users = self.rs.get_friends_group()
+        if not id_match:
+            return False
+        self.menu_scr.build_usr_list(self.users)
+
+        id_match, num = self.rs.create_dialog(name)
+        if not id_match:
+            return False
+        self.screens.add_widget(DialogScreen(number = num, name = name))
+
+    def decline_request(self, name):
+        id_match = self.rs.decline_add_request(name)
+        if not id_match:
+            return
+
+        for idx, el in enumerate(self.users[1]):
+            if el[0] == name:
+                self.users[1].pop(idx)
+                break
+
+    def take_request_back(self, name):
+        id_match = self.rs.take_request_back(name)
+        if not id_match:
+            return False
+
+        for idx, el in enumerate(self.users[4]):
+            if el[0] == name:
+                self.users[4].pop(idx)
+                break
+        self.menu_scr.build_usr_list(self.users)
 
     def send_request(self, name, status, msg):
-        print('send_request')
-        self.users[4].append((name, status))
+        id_match = self.rs.send_request(name, msg)
+        if not id_match:
+            return False
+
+        self.users[4].append((name, status, msg))
         self.menu_scr.build_usr_list(self.users)
 
     def get_user_groups(self, bt = None):
-        self.menu_scr.build_usr_list(self.users)
-        users_with_dialogs = [self.users[i] for i in (0, 2, 3, 5)]
-        for i in (name[0] for group in users_with_dialogs for name in group):
-            self.screens.add_widget(DialogScreen(name = i))
+        id_match, users = self.rs.get_friends_group()
+        if not id_match:
+            return False
+        users = users[0]
+        id_match, requests = self.rs.get_add_requests()
+        if not id_match:
+            return False
+        requests = requests[0]
 
-    def delete_dialog(self, bt = None):
-        pass
+        for user in (name[0] for group in users for name in group if name):
+            id_match, num = self.rs.create_dialog(user)
+            if not id_match:
+                continue
+
+            self.screens.add_widget(DialogScreen(name = user, number = num))
+
+        users.insert(1, requests[0])
+        users.insert(4, requests[1])
+        self.users = users
+        self.menu_scr.build_usr_list(users)
+
+    def delete_dialog(self, number):
+        id_match = self.rs.delete_dialog(number)
+        if not id_match:
+            return
+        self.to_menu()
 
     def register(self, bt = None):
         if not re.match(self.nick_ptrn,
                         self.register_scr.tx_usr.text):
             ErrorDisp(self.invalid_nick).open()
             return
-        elif not 'username_free':
+
+        nick = self.register_scr.tx_usr.text
+        pswd = self.register_scr.tx_pass.text
+        status, id_match = self.rs.register(nick, pswd)
+        if not id_match:
+            return False
+
+        if not status:
             ErrorDisp(self.nick_taken).open()
             return
 
-        'register'
         self.nick = self.register_scr.tx_usr.text
-        info_box = self.menu_scr.info_box
-        info_box.logged_as_lb.text = l["Logged in as\n"] + self.nick
-
-        self.get_profile_info(self.nick)
-
-        info_box.avatar.source = 'textures/panels/avatar_placeholder.png'
-
-        self.get_user_groups()
-
-        self.to_menu()
-
-    def login(self, bt = None):
-        if not 'password_correct':
-            ErrorDisp(self.wrong_pswd).open()
-            return
-        'login'
-
-        self.nick = self.login_scr.tx_usr.text
         info_box = self.menu_scr.info_box
         info_box.logged_as_lb.text = l["Logged in as\n"] + self.nick
 
@@ -2614,13 +2740,46 @@ class ChatApp(App):
 
         profile = self.profiles[self.nick]
 
-        info_box.avatar.source = profile.image_name
+        info_box.avatar_texture = CoreImage(BytesIO(profile.image_data),
+                                            ext = 'png')
+        info_box.avatar.texture = info_box.avatar_texture.texture
 
         self.get_user_groups()
 
         self.to_menu()
 
-    def logout(self, bt = None):
+    def login(self, bt = None):
+        nick = self.login_scr.tx_usr.text
+        pswd = self.login_scr.tx_pass.text
+        status, id_match = self.rs.login(nick, pswd)
+        if not id_match:
+            return False
+
+        if not status:
+            ErrorDisp(self.wrong_pswd).open()
+            return
+
+        self.nick = nick
+        info_box = self.menu_scr.info_box
+        info_box.logged_as_lb.text = l["Logged in as\n"] + self.nick
+
+        self.get_profile_info(self.nick)
+
+        profile = self.profiles[self.nick]
+
+        info_box.avatar_texture = CoreImage(BytesIO(profile.image_data),
+                                            ext = 'png')
+        info_box.avatar.texture = info_box.avatar_texture.texture
+
+        self.get_user_groups()
+
+        self.to_menu()
+
+    def logout(self, tm = None, request = True):
+        if request:
+            id_match = self.rs.logout()
+            if not id_match:
+                return
         self.login_scr.tx_usr.text = ''
         self.login_scr.tx_pass.text = ''
         self.register_scr.tx_usr.text = ''
@@ -2631,45 +2790,61 @@ class ChatApp(App):
             self.screens.remove_widget(scr)
         self.to_login()
 
-    def search_username(self, query):
-        'search_username'
-        return [(query, True)]
+    def get_search_list(self):
+        id_match, search_result = self.rs.get_search_list(query)
+        if not id_match:
+            return []
+        search_result = search_result[0]
+        return search_result
 
-    def search_message(self, screen, text, l_tm, u_tm):
-        'search_message'
-        return ((text + 'lol', (u_tm - l_tm) // 2, screen.name),
-                (text + 'kek', (u_tm - l_tm) // 2, self.nick))
+    def search_message(self, dialog, text, l_tm, u_tm):
+        id_match, search_results = self.rs.search_msg(dialog, text, l_tm, u_tm)
+        if not id_match:
+            return []
+        return search_results
+
+    def send_message(self, text, tm, dialog):
+        return self.rs.send_message(text, tm, dialog)
 
     def get_profile_info(self, nick):
-        'get_profile_info'
-        if nick not in self.profiles:
-            prof = ProfileData(nick, '', 150, 'undefined', '',
-                               'textures/panels/avatar_placeholder.png')
-            self.profiles[nick] = prof
+        id_match, profile_info = self.rs.get_profile_info(nick)
+        if not id_match:
+            return
+
+        data = ProfileData(nick, *profile_info)
+        self.profiles[nick] = data
 
     def change_profile_section(self, sect, chg):
-        'change_profile_section'
+        return self.rs.change_profile_section(sect, chg)
 
-    def set_image(self, img_name):
-        'set_image'
-        self.menu_scr.info_box.avatar.source = img_name
+    def set_image(self, img_data):
+        return self.rs.set_image(img_data)
 
     def delete_profile(self):
-        'delete_profile'
+        id_match = self.rs.delete_profile()
+        if not id_match:
+            return
         self.profiles.pop(self.nick)
-        self.logout()
+        self.logout(request = False)
 
-    def get_message_history(self, num):
-        'get_message_history'
-        history = []
-        for i in range(num):
-            history.append((str(i), 1000000, self.nick))
+    def get_message_history(self, dialog_number, amount):
+        id_match, history = self.rs.get_message_history(amount, dialog_number)
+        if not id_match:
+            return []
         return history
 
     def open_settings(self):
         pass
 
+    def on_stop(self):
+        self.rs.ioloop.stop()
+
     def build(self):
+        self.rs = RequestSender()
+
+        # Spin out a separate thread for communication with the server
+        Thread(target = self.rs.run).start()
+
         Window.clearcolor = (0.71, 0.85, 1, 1)
         self.nick = ''
         self.person = ''
@@ -2703,6 +2878,7 @@ class ChatApp(App):
         self.screens.add_widget(self.settings_scr)
         self.screens.add_widget(self.help_scr)
         inspector.create_inspector(Window, self.screens)
+
         return self.screens
 
 
