@@ -2784,7 +2784,7 @@ class ChatApp(App):
         self.login_scr.tx_pass.text = ''
         self.register_scr.tx_usr.text = ''
         self.register_scr.tx_pass.text = ''
-        users_with_dialogs = [self.users[i] for i in (0, 2, 3, 5)]
+        users_with_dialogs = [self.users[i] for i in (2, 3, 5)]
         for i in (name[0] for group in users_with_dialogs for name in group):
             scr = self.screens.get_screen(i)
             self.screens.remove_widget(scr)
