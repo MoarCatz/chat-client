@@ -5,7 +5,7 @@ lcl = {'Sender': 'Отправитель',
        'Date': 'Дата',
        'Message text:': 'Текст сообщения',
        'Back': 'Назад',
-       'The selected file should be a PNG or a JPG image': 'Выбранный файл должен быть PNG или JPG картинкой',
+       'The selected file should be a PNG image': 'Выбранный файл должен быть PNG картинкой',
        'Please, select a file': 'Пожалуйста, выберите файл',
        'Select': 'Выбрать',
        'Cancel': 'Закрыть',
@@ -113,7 +113,8 @@ lcl = {'Sender': 'Отправитель',
        'Help': 'Справка',
        'Name': 'Имя',
        'Size': 'Размер',
-       'About': 'О программе'}
+       'About': 'О программе',
+       'Request Message': 'Сообщение запроса'}
 
 with open('local_ru.json', 'w') as f:
     json.dump(lcl, f, ensure_ascii = False, sort_keys = True, indent = 2)
