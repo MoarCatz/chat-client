@@ -7,6 +7,9 @@ Our project is made to provide a secure way of exchanging messages in real-time.
 On the launch of the app, you can create a new account by pressing the [font=fonts/NotoSans_RI.ttf]Register[/font] button. For that, you'll need to fill out a form containing the following fields:
 
 * [color=#000050]Login[/color]
+
+  The login can only consist of letters, numbers, underscores and spaces. It has to be from 2 to 15 characters in length and must not begin with spaces.
+
 * [color=#000050]Password (twice)[/color]
 
 [color=#295B90][font=fonts/NotoSans_RI.ttf]When you'll finish, you will be automatically logged in with your new account.[/font][/color]
