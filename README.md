@@ -11,13 +11,14 @@ Here is a list of Python dependencies we're using right now:
 * [Kivy](https://github.com/kivy/kivy)
 * [Tornado](https://github.com/tornadoweb/tornado)
 * [rsa](https://pypi.python.org/pypi/rsa)
+* [pyaes](https://github.com/ricmoo/pyaes)
 
-The good news is that you don't need to install them when using prebuilt package.
+The good news is that you don't need to install them when using the prebuilt package.
 
 =============
 
 ### Installation
-Here is a step by step example of how you can get our app up and running:
+Here is a step-by-step example of how you can get our app up and running:
 
 #### From Precompiled Package (recommended)
 1. Head over to the latest release and grab the most suitable package for you. 
