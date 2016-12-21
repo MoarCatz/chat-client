@@ -45,9 +45,7 @@ from kivy.base import stopTouchApp, EventLoop
 from kivy.uix.filechooser import FileChooserListView, FileSystemLocal
 from kivy.uix.tabbedpanel import TabbedPanel, TabbedPanelHeader
 from kivy.uix.rst import RstDocument
-
-# For debugging purposes, will be removed
-from kivy.modules import inspector
+from kivy.atlas import Atlas
 
 from client import RequestSender
 
@@ -59,8 +57,8 @@ Builder.load_string('''
 <Button>:
     color: 1, 1, 1, 1
     disabled_color: 1, 1, 1, 1
-    background_normal: 'textures/button/normal.png'
-    background_down: 'textures/button/down.png'
+    background_normal: app.theme['normal']
+    background_down: app.theme['down']
 
 <Popup>:
     size_hint: None, None
@@ -79,9 +77,9 @@ Builder.load_string('''
     font_size: 8
 
 <DialogButton>:
-    background_normal: 'textures/button/menubt_normal.png'
-    background_down: 'textures/button/inputbt_down.png'
-    background_disabled_normal: 'textures/button/menubt_normal.png'
+    background_normal: app.theme['menubt_normal']
+    background_down: app.theme['inputbt_down']
+    background_disabled_normal: app.theme['menubt_normal']
     text_size: self.width - 10, self.height
     valign: 'center'
     font_size: 14
@@ -118,12 +116,12 @@ Builder.load_string('''
         Rectangle:
             size: self.size
             pos: self.pos
-            source: 'textures/panels/input_panel.png'
+            source: app.theme['input_panel']
     padding: 0, 8
 
 <InputButton>:
-    background_normal: 'textures/button/inputbt_normal.png'
-    background_down: 'textures/button/inputbt_down.png'
+    background_normal: app.theme['inputbt_normal']
+    background_down: app.theme['inputbt_down']
     font_name: 'fonts/NotoSans_B.ttf'
 
 <LoggedAsLabel>:
@@ -164,8 +162,8 @@ Builder.load_string('''
 
 <MenuButton>:
     size_hint: 1, 0.09
-    background_normal: 'textures/button/topbt_normal.png'
-    background_down: 'textures/button/inputbt_down.png'
+    background_normal: app.theme['topbt_normal']
+    background_down: app.theme['inputbt_down']
     font_name: 'fonts/NotoSans_R.ttf'
     font_size: 17
     markup: True
@@ -178,7 +176,7 @@ Builder.load_string('''
             points: self.x, self.y, self.x, self.y + self.height
             width: 1.5
         Rectangle:
-            source: 'textures/button/inputbt_normal.png'
+            source: app.theme['inputbt_normal']
             size: self.size
             pos: self.pos
         Line:
@@ -199,8 +197,8 @@ Builder.load_string('''
             size: self.width - 2, self.height - 2
 
 <MessageInput>:
-    background_normal: 'textures/textinput/msginput_unfocused.png'
-    background_active: 'textures/textinput/msginput_focused.png'
+    background_normal: app.theme['msginput_unfocused']
+    background_active: app.theme['msginput_focused']
     font_name: "fonts/NotoSans_R.ttf"
     cursor_color: 0, 0, 0, 1
     write_tab: False
@@ -229,8 +227,8 @@ Builder.load_string('''
     font_name: "fonts/NotoSans_R.ttf"
     cursor_color: 0, 0, 0, 1
     write_tab: False
-    background_normal: "textures/textinput/field.png"
-    background_active: "textures/textinput/field_active.png"
+    background_normal: app.theme['field']
+    background_active: app.theme['field_active']
 
 <NickLabel>:
     background_color: 0, 0, 0, 0
@@ -242,8 +240,8 @@ Builder.load_string('''
 <OptButton>:
     size_hint_y: None
     font_size: 12
-    background_normal: 'textures/button/drop_opt.png'
-    background_down: 'textures/button/drop_opt_down.png'
+    background_normal: app.theme['drop_opt']
+    background_down: app.theme['drop_opt_down']
     height: 20
 
 <PersonLayout>:
@@ -257,8 +255,8 @@ Builder.load_string('''
                     self.x, self.y + self.height
 
 <ProfileButton>:
-    background_normal: 'textures/button/normal.png'
-    background_down: 'textures/button/down.png'
+    background_normal: app.theme['normal']
+    background_down: app.theme['down']
     font_name: 'fonts/NotoSans_B.ttf'
     size: 145, 40
     size_hint: None, None
@@ -335,8 +333,8 @@ Builder.load_string('''
             size: self.width, self.height - 10
 
 <SpinnerOption>:
-    background_normal: 'textures/button/normal.png'
-    background_down: 'textures/button/down.png'
+    background_normal: app.theme['normal']
+    background_down: app.theme['down']
 
 <UsernameButton>:
     text_size: self.width - 10, self.height
@@ -361,8 +359,8 @@ Builder.load_string('''
             size: self.size
 
 <YesNoButton>:
-    background_normal: 'textures/button/normal.png'
-    background_down: 'textures/button/down.png'
+    background_normal: app.theme['normal']
+    background_down: app.theme['down']
     font_name: 'fonts/NotoSans_B.ttf'
 ''')
 
@@ -370,7 +368,7 @@ Builder.load_string('''
 def _get_settings():
     if not os.path.exists('settings.json'):
         sets = {'lang': 'English',
-                'thm': 'Blue (default)'}
+                'thm': 'Blue'}
         for i in range(10):
             sets[str(i)] = ''
 
@@ -383,6 +381,17 @@ def _get_settings():
 
     with open('settings.json') as f:
         return json.load(f)
+
+
+class TextureResolver:
+    def __init__(self, atlas_path):
+        # atlas_path should be given without '.atlas'
+        if atlas_path[-1] != '/':
+            atlas_path += '/'
+        self.atlas_path = 'atlas://' + atlas_path
+
+    def __getitem__(self, key):
+        return self.atlas_path + key
 
 
 class EngLoc:
@@ -415,8 +424,8 @@ class FullSizeLabel(Label):
 class HelpPage(TabbedPanelHeader):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.background_normal = 'textures/button/tab.png'
-        self.background_down = 'textures/button/tab_active.png'
+        self.background_normal = app.theme['tab']
+        self.background_down = app.theme['tab_active']
         self.color = (0, 0, 0, 1)
         self.font_size = 11
 
@@ -653,12 +662,12 @@ class Status(BoxLayout):
     online = BooleanProperty(True)
     def __init__(self, online = True, **kwargs):
         super().__init__(**kwargs)
-        self.img = Image(source = 'textures/panels/status_on.png')
+        self.img = Image(source = app.theme['status_on'])
         self.online = online
         self.add_widget(self.img)
 
     def on_online(self, inst, ch):
-        path = 'textures/panels/status_' + ('on.png' if ch else 'off.png')
+        path = app.theme['status_' + ('on' if ch else 'off')]
         self.img.source = path
 
 
@@ -689,9 +698,9 @@ class InfoView(BoxLayout):
                                   cursor_color = (0, 0, 0, 0),
                                   size_hint = (1, 0.6),
                                   background_normal =
-                                  'textures/textinput/msginput_unfocused.png',
+                                  app.theme['msginput_unfocused'],
                                   background_active =
-                                  'textures/textinput/msginput_unfocused.png')
+                                  app.theme['msginput_unfocused'])
 
         self.add_widget(self.info_lb)
         self.add_widget(self.msg_label)
@@ -704,14 +713,12 @@ class ProfileBar(BoxLayout):
         self.back_bt = Button(text = '   ' + l['Back'],
                               size_hint = (0.23, 1),
                               font_name = 'fonts/NotoSans_R.ttf',
-                              background_normal =
-                              'textures/button/menubt_normal.png',
-                              background_down =
-                              'textures/button/inputbt_down.png')
+                              background_normal = app.theme['menubt_normal'],
+                              background_down = app.theme['inputbt_down'])
         self.back_bt.bind(on_release = app.back_action)
         self.plc = Button(disabled = True,
                           background_disabled_normal =
-                          'textures/button/menubt_normal.png',
+                          app.theme['menubt_normal'],
                           size_hint = (1, 1))
         self.add_widget(self.back_bt)
         self.add_widget(self.plc)
@@ -726,8 +733,8 @@ class Profile(Screen):
         page.email_field.text = profile_data.email
         page.birthday_field.update_selectors(profile_data.bday)
         page.about_field.text = profile_data.about
-        page.avatar_texture = CoreImage(BytesIO(profile_data.image_data,
-                                                ext = 'png'))
+        page.avatar_texture = CoreImage(BytesIO(profile_data.image_data),
+                                        ext = 'png')
         page.avatar.texture = page.avatar_texture.texture
 
     def __init__(self, **kwargs):
@@ -748,9 +755,9 @@ class ProfileField(TextInput):
         super().__init__(**kwargs)
         self.size = 220, kwargs.get('height', 30)
         self.size_hint = None, None
-        self.background_normal = "textures/textinput/field.png"
-        self.background_disabled_normal = "textures/textinput/field.png"
-        self.background_active = "textures/textinput/field_active.png"
+        self.background_normal = app.theme['field']
+        self.background_disabled_normal = app.theme['field']
+        self.background_active = app.theme['field_active']
         self.cursor_color = [0, 0, 0, 1]
         self.selection_color = [0.18, 0.65, 0.83, 0.5]
         self.disabled_foreground_color = [0, 0, 0, 1]
@@ -826,6 +833,9 @@ class AvatarSelectDialog(Popup):
             profile_data.image_data = img
             self.cont.avatar_texture = CoreImage(BytesIO(img), ext = 'png')
             self.cont.avatar.texture = self.cont.avatar_texture.texture
+            info_box = app.menu_scr.info_box
+            info_box.avatar_texture = CoreImage(BytesIO(img), ext = 'png')
+            info_box.avatar.texture = info_box.avatar_texture.texture
             self.dismiss()
         else:
             ErrorDisp(l['Please, select a file']).open()
@@ -844,17 +854,15 @@ class AvatarSelectDialog(Popup):
                                     spacing = 4)
         self.select_bt = Button(text = '[size=20][/size] ' + l['Select'],
                                 font_name = 'fonts/NotoSans_R.ttf',
-                                background_normal =
-                                'textures/button/normal.png',
-                                background_down = 'textures/button/down.png',
+                                background_normal = app.theme['normal'],
+                                background_down = app.theme['down'],
                                 font_size = 16,
                                 markup = True,
                                 on_release = self.set_image)
         self.cancel_bt = Button(text = '[size=20][/size] ' + l['Cancel'],
                                 font_name = 'fonts/NotoSans_R.ttf',
-                                background_normal =
-                                'textures/button/normal.png',
-                                background_down = 'textures/button/down.png',
+                                background_normal = app.theme['normal'],
+                                background_down = app.theme['down'],
                                 font_size = 16,
                                 markup = True,
                                 on_release = self.dismiss)
@@ -868,6 +876,10 @@ class AvatarSelectDialog(Popup):
 
 
 class ProfilePage(FloatLayout):
+    sect_map = {'status':   0,
+                'email':    1,
+                'birthday': 2,
+                'about':    3}
     editing = False
     def edit(self, bt):
         for field in self.fields:
@@ -877,25 +889,29 @@ class ProfilePage(FloatLayout):
             profile_data = app.profiles[self.nick_field.text]
             status = self.status_field.text
             if profile_data.status != status:
-                success = app.change_profile_section('status', status)
+                success = app.change_profile_section(self.sect_map['status'],
+                                                     status)
                 if success:
                     profile_data.status = status
 
             email = self.email_field.text
             if profile_data.email != email:
-                success = app.change_profile_section('email', email)
+                success = app.change_profile_section(self.sect_map['email'],
+                                                     email)
                 if success:
                     profile_data.email = email
 
             bday = self.birthday_field.timestamp
             if profile_data.bday != bday:
-                success = app.change_profile_section('birthday', bday)
+                success = app.change_profile_section(self.sect_map['birthday'],
+                                                     bday)
                 if success:
                     profile_data.bday = bday
 
             about = self.about_field.text
             if profile_data.about != about:
-                success = app.change_profile_section('about', about)
+                success = app.change_profile_section(self.sect_map['about'],
+                                                     about)
                 if success:
                     profile_data.about = about
         self.editing = not self.editing
@@ -1014,8 +1030,8 @@ class DateDropItem(SpinnerOption):
         super().__init__(**kwargs)
         self.font_size = 14
         self.height = 30
-        self.background_normal = 'textures/button/drop_opt_white.png'
-        self.background_down = 'textures/button/drop_opt_down.png'
+        self.background_normal = app.theme['drop_opt_white']
+        self.background_down = app.theme['drop_opt_down']
         self.color = (0, 0, 0, 1)
 
 
@@ -1024,9 +1040,9 @@ class MonthSelector(Spinner):
         super().__init__(**kwargs)
         self.option_cls = DateDropItem
         self.effect_cls = ScrollEffect
-        self.background_normal = 'textures/button/picker_mid.png'
-        self.background_disabled_normal = 'textures/button/picker_mid.png'
-        self.background_down = 'textures/button/picker_mid_active.png'
+        self.background_normal = app.theme['picker_mid']
+        self.background_disabled_normal = app.theme['picker_mid']
+        self.background_down = app.theme['picker_mid_active']
         self.disabled_color = (0, 0, 0, 1)
         self.color = (0, 0, 0, 1)
         self.font_size = 15
@@ -1083,7 +1099,7 @@ class DatePicker(BoxLayout):
             ts = datetime(int(self.year.text),
                           self.month_match[self.month.text],
                           int(self.day.text))
-            self.timestamp = ts.timestamp()
+            self.timestamp = int(ts.timestamp())
         except (ValueError, OverflowError):
             inst.text = inst.prev
 
@@ -1103,11 +1119,11 @@ class DatePicker(BoxLayout):
 
         self.year = DateTextField(size_hint = (0.25, 1),
                                   background_normal =
-                                  'textures/button/picker_right.png',
+                                  app.theme['picker_right'],
                                   background_disabled_normal =
-                                  'textures/button/picker_right.png',
+                                  app.theme['picker_right'],
                                   background_active =
-                                  'textures/button/picker_right_active.png',
+                                  app.theme['picker_right_active'],
                                   font_size = 15,
                                   prev = '1970')
         self.month = MonthSelector(size_hint = (0.6, 1),
@@ -1119,11 +1135,11 @@ class DatePicker(BoxLayout):
 
         self.day = DateTextField(size_hint = (0.15, 1),
                                  background_normal =
-                                 'textures/button/picker_left.png',
+                                 app.theme['picker_left'],
                                  background_disabled_normal =
-                                 'textures/button/picker_left.png',
+                                 app.theme['picker_left'],
                                  background_active =
-                                 'textures/button/picker_left_active.png',
+                                 app.theme['picker_left_active'],
                                  font_size = 15,
                                  prev = '01')
 
@@ -1166,29 +1182,28 @@ class ExtendedDatePicker(DatePicker):
         self.hour = DateTextField(size_hint = (0.2, 1),
                                   prev = '00',
                                   font_size = 11,
-                                  background_normal =
-                                  'textures/button/picker_left.png',
+                                  background_normal = app.theme['picker_left'],
                                   background_disabled_normal =
-                                  'textures/button/picker_left.png',
+                                  app.theme['picker_left'],
                                   background_active =
-                                  'textures/button/picker_left_active.png')
+                                  app.theme['picker_left_active'])
         self.minute = DateTextField(size_hint = (0.2, 1),
                                     prev = '00',
                                     background_normal =
-                                    'textures/button/picker_mid.png',
+                                    app.theme['picker_mid'],
                                     background_disabled_normal =
-                                    'textures/button/picker_mid.png',
+                                    app.theme['picker_mid'],
                                     background_active =
-                                    'textures/button/picker_mid_active.png',
+                                    app.theme['picker_mid_active'],
                                     font_size = 11)
         self.second = DateTextField(size_hint = (0.2, 1),
                                     prev = '00',
                                     background_normal =
-                                    'textures/button/picker_right.png',
+                                    app.theme['picker_right'],
                                     background_disabled_normal =
-                                    'textures/button/picker_right.png',
+                                    app.theme['picker_right'],
                                     background_active =
-                                    'textures/button/picker_right_active.png',
+                                    app.theme['picker_right_active'],
                                     font_size = 11)
 
         self.add_widget(Widget(size_hint_x = 0.03))
@@ -1240,7 +1255,7 @@ class RegScreen(Screen):
                                     text = ' ' + l['Login'],
                                     on_release = app.to_login,
                                     background_normal =
-                                    'textures/button/menubt_normal.png')
+                                    app.theme['menubt_normal'])
 
         self.lb_usr = Label(size_hint = (0.28, 0.03),
                             pos_hint = {"top": 0.75, "right": 0.255},
@@ -1279,12 +1294,10 @@ class RegScreen(Screen):
                               text = l['Next'],
                               font_size = 16,
                               disabled = True,
-                              background_normal =
-                              "textures/button/normal_intro.png",
-                              background_down =
-                              "textures/button/down_intro.png",
+                              background_normal = app.theme['normal_intro'],
+                              background_down = app.theme['down_intro'],
                               background_disabled_normal =
-                              "textures/button/disabled_intro.png",
+                              app.theme['disabled_intro'],
                               on_release = app.register)
 
         self.show_psw = ShowPswdButton()
@@ -1315,9 +1328,8 @@ class ErrorDisp(Popup):
                           pos_hint = {"top": 0.163, "right": 0.94},
                           text = l['Back'],
                           font_size = 15,
-                          background_normal =
-                          "textures/button/normal_intro.png",
-                          background_down = "textures/button/down_intro.png",
+                          background_normal = app.theme['normal_intro'],
+                          background_down = app.theme['down_intro'],
                           on_release = self.dismiss)
         self.lb = ErrorLabel(text = text,
                              font_size = 13,
@@ -1365,10 +1377,8 @@ class MenuAddBar(BoxLayout):
                              markup = True,
                              font_name = 'fonts/NotoSans_B.ttf',
                              font_size = 16,
-                             background_normal =
-                             'textures/button/menubt_normal.png',
-                             background_down =
-                             'textures/button/inputbt_down.png')
+                             background_normal = app.theme['menubt_normal'],
+                             background_down = app.theme['inputbt_down'])
         self.add_widget(self.plc)
         self.add_widget(self.add_bt)
 
@@ -1537,7 +1547,7 @@ class MenuScreen(Screen):
         self.users_disp.bind(minimum_height = self.users_disp.setter('height'))
 
         self.add_person_popup = AddPersonPopup()
-        self.add_bar.add_bt.on_press = self.initialize_search
+        self.add_bar.add_bt.bind(on_press = self.initialize_search)
 
         self.div_favs = RecordDivider(text = l["favorites"])
         self.div_requests = RecordDivider(text = l["add requests"])
@@ -1602,7 +1612,7 @@ class UserRecord(BoxLayout):
 
     def f_accept_request(self, bt):
         self.opts.dismiss()
-        app.accept_request()
+        app.accept_request(self.name.text)
 
     def f_decline_request(self, bt):
         self.opts.dismiss()
@@ -1697,9 +1707,9 @@ class FriendRecord(UserRecord):
 
 
 class RequestGotRecord(UserRecord):
-    def __init__(self, msg = '', *args, **kwargs):
+    def __init__(self, *args, **kwargs):
+        self.message = kwargs.pop('msg', '')
         super().__init__(*args, action = self._nop, **kwargs)
-        self.message = msg
         self.profile = OptButton(self,
                                  text = l["Profile"],
                                  on_press = self.f_to_profile)
@@ -1806,7 +1816,7 @@ class LoginScreen(Screen):
                                        markup = True,
                                        on_release = app.to_register,
                                        background_normal =
-                                       'textures/button/menubt_normal.png')
+                                       app.theme['menubt_normal'])
 
         self.lb_usr = Label(size_hint = (0.28, 0.03),
                             pos_hint = {"top": 0.67, "right": 0.255},
@@ -1830,16 +1840,14 @@ class LoginScreen(Screen):
                                  checker = self)
 
         self.bt_next = Button(size_hint = (0.4, 0.18),
-                              pos_hint = {"top": 0.185, "right": 0.94},
+                              pos_hint = {"top": 0.18, "right": 0.94},
                               text = l['Next'],
                               font_size = 16,
                               disabled = True,
-                              background_normal =
-                              "textures/button/normal_intro.png",
-                              background_down =
-                              "textures/button/down_intro.png",
+                              background_normal = app.theme['normal_intro'],
+                              background_down = app.theme['down_intro'],
                               background_disabled_normal =
-                              "textures/button/disabled_intro.png",
+                              app.theme['disabled_intro'],
                               on_release = app.login)
 
         self.show_psw = ShowPswdButton()
@@ -1867,7 +1875,7 @@ class SettingsItem(BoxLayout):
         with self.canvas:
             Rectangle(size = self.size,
                       pos = self.pos,
-                      source = 'textures/button/menubt_normal.png')
+                      source = app.theme['menubt_normal'])
         self.changer = changer(size_hint = (0.4, 1))
         self.setting_name = FullSizeLabel(text = title,
                                           bound = (40, 20),
@@ -1918,7 +1926,7 @@ class SettingsTheme(Button):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.options = [l['Blue (default)']]
+        self.options = [l['Blue']]
         self.text = l[app.theme_name]
         self.background_color = (0, 0, 0, 0)
         self.selector = Popup(title = l['Select a theme'],
@@ -1947,21 +1955,19 @@ class BackBar(BoxLayout):
         self.back_bt = Button(text = '  ' + l['Back'],
                               size_hint = (0.15, 1),
                               font_name = 'fonts/NotoSans_B.ttf',
-                              background_normal = 'textures/button/'
-                                                  'menubt_normal.png',
-                              background_down = 'textures/button/'
-                                                'inputbt_down.png',
+                              background_normal = app.theme['menubt_normal'],
+                              background_down = app.theme['inputbt_down'],
                               on_release = self.to_menu)
 
         self.title = Button(disabled = True,
                             background_disabled_normal =
-                            'textures/button/menubt_normal.png',
+                            app.theme['menubt_normal'],
                             size_hint = (0.7, 1),
                             text = title,
                             font_name = 'fonts/NotoSans_B.ttf')
         self.plc = Button(disabled = True,
                           background_disabled_normal =
-                          'textures/button/menubt_normal.png',
+                          app.theme['menubt_normal'],
                           size_hint = (0.15, 1))
 
         self.add_widget(self.back_bt)
@@ -1998,8 +2004,8 @@ class SmileInput(MessageInput):
         self.num = num
         self.text = app.settings[str(num)]
         self.font_size = 13
-        self.background_normal = 'textures/textinput/field.png'
-        self.background_active = 'textures/textinput/field_active.png'
+        self.background_normal = app.theme['field']
+        self.background_active = app.theme['field_active']
 
 
 class SettingsScreen(Screen):
@@ -2023,7 +2029,7 @@ class SettingsScreen(Screen):
                                size_hint = (None, None),
                                disabled = True,
                                background_disabled_normal =
-                               'textures/button/normal.png',
+                               app.theme['normal'],
                                size = (width, 30),
                                pos_hint = {"center_x": 0.5, "top": 0.63})
 
@@ -2072,7 +2078,7 @@ class AddPersonPopup(Popup):
         self.user_list = None
 
     def matches(self, query):
-        if self.user_list is None:
+        if self.user_list is None or not query:
             return []
 
         return [i for i in self.user_list if query in i[0]]
@@ -2116,9 +2122,8 @@ class AddPersonPopup(Popup):
                                   text = l['OK'],
                                   font_size = 15,
                                   background_normal =
-                                  "textures/button/normal_intro.png",
-                                  background_down =
-                                  "textures/button/down_intro.png")
+                                  app.theme['normal_intro'],
+                                  background_down = app.theme['down_intro'])
 
         self.msg_cont.add_widget(self.msg_input)
         self.msg_cont.add_widget(self.msg_confirm)
@@ -2209,8 +2214,8 @@ class DialogOptButton(Button):
         super().__init__(**kwargs)
         self.size_hint_y = None
         self.font_size = 12
-        self.background_normal = 'textures/button/drop_opt.png'
-        self.background_down = 'textures/button/drop_opt_down.png'
+        self.background_normal = app.theme['drop_opt']
+        self.background_down = app.theme['drop_opt_down']
         self.font_name = 'fonts/NotoSans_B.ttf'
         self.height = 22
         self.markup = True
@@ -2238,7 +2243,7 @@ class DialogButtonBar(BoxLayout):
                                  size_hint = (0.2, 1),
                                  on_release = app.to_menu)
         self.plc = Button(background_disabled_normal =
-                          'textures/button/menubt_normal.png',
+                          app.theme['menubt_normal'],
                           disabled = True,
                           size_hint = (0.34, 1))
 
@@ -2248,7 +2253,7 @@ class DialogButtonBar(BoxLayout):
                                  halign = 'right',
                                  on_release = self.drop_open)
         self.opts_plc = Button(background_disabled_normal =
-                               'textures/button/menubt_normal.png',
+                               app.theme['menubt_normal'],
                                disabled = True)
 
         off = 0 if app.language == 'English' else 3
@@ -2289,8 +2294,8 @@ class SearchMsgButton(Button):
         super().__init__(**kwargs)
         self.cont = cont
         self.font_name = 'fonts/NotoSans_R.ttf'
-        self.background_normal = 'textures/button/normal.png'
-        self.background_down = 'textures/button/down.png'
+        self.background_normal = app.theme['normal']
+        self.background_down = app.theme['down']
 
 
 class SearchMsgPopup(Popup):
@@ -2484,7 +2489,7 @@ class DialogInputBar(BoxLayout):
 
 
 class ProfileData:
-    def __init__(self, nick, status, bday, email, about, image_data):
+    def __init__(self, nick, status, email, bday, about, image_data):
         self.nick = nick
         self.status = status
         self.bday = bday
@@ -2513,7 +2518,7 @@ class ChatApp(App):
     profiles = {}
     msg_amount = 50
     language = StringProperty('English')
-    theme_name = StringProperty(l['Blue (default)'])
+    theme_name = StringProperty(l['Blue'])
 
     def back_to_search(self, bt = None):
         self.screens.current = 'menu'
@@ -2668,6 +2673,7 @@ class ChatApp(App):
             if el[0] == name:
                 self.users[1].pop(idx)
                 break
+        self.menu_scr.build_usr_list(self.users)
 
     def take_request_back(self, name):
         id_match = self.rs.take_request_back(name)
@@ -2685,8 +2691,9 @@ class ChatApp(App):
         if not id_match:
             return False
 
-        self.users[4].append((name, status, msg))
+        self.users[4].append((name, msg, status))
         self.menu_scr.build_usr_list(self.users)
+        return True
 
     def get_user_groups(self, bt = None):
         id_match, users = self.rs.get_friends_group()
@@ -2698,7 +2705,7 @@ class ChatApp(App):
             return False
         requests = requests[0]
 
-        for user in (name[0] for group in users for name in group if name):
+        for user in (name[0] for group in users[1:] for name in group if name):
             id_match, num = self.rs.create_dialog(user)
             if not id_match:
                 continue
@@ -2791,7 +2798,7 @@ class ChatApp(App):
         self.to_login()
 
     def get_search_list(self):
-        id_match, search_result = self.rs.get_search_list(query)
+        id_match, search_result = self.rs.get_search_list()
         if not id_match:
             return []
         search_result = search_result[0]
@@ -2853,6 +2860,7 @@ class ChatApp(App):
 
         self.language = self.settings['lang']
         self.theme_name = self.settings['thm']
+        self.theme = TextureResolver('themes/' + self.theme_name.lower())
 
         self.return_scr = 'menu'
         self.back_action = self.back_to_screen
@@ -2877,7 +2885,6 @@ class ChatApp(App):
         self.screens.add_widget(self.profile_scr)
         self.screens.add_widget(self.settings_scr)
         self.screens.add_widget(self.help_scr)
-        inspector.create_inspector(Window, self.screens)
 
         return self.screens
 

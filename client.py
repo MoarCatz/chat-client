@@ -250,7 +250,7 @@ class RequestSender:
 
     def get_friends_group(self):
         """Возвращает список друзей
-        Формат: [онлайн, оффлайн, избранное, заблокированные]`"""
+        Формат: [избранное, онлайн, оффлайн, заблокированные]`"""
         req_id = self._request_id()
         self.ioloop.add_callback(self._send, cc.friends_group, req_id)
         response = self.response_queue.get()
@@ -458,7 +458,10 @@ class RequestSender:
         """Устанавливает бинарные данные картинки img_data как аватар
         Не возвращает данные"""
         req_id = self._request_id()
-        response = self._send(cc.set_image, req_id, b64encode(img_data))
+
+        self.ioloop.add_callback(self._send, cc.set_image, req_id,
+                                 b64encode(img_data).decode())
+        response = self.response_queue.get()
         id_match = self._process(response, cc.set_image, req_id)
         return id_match
 

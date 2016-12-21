@@ -74,7 +74,7 @@ lcl = {'Sender': 'Отправитель',
        'Remove from blacklist': 'Разблокировать',
        'Send add request': 'Отправить запрос в друзья',
        'Select a language': 'Выберите язык',
-       'Blue (default)': 'Синяя (стандартная)',
+       'Blue': 'Синяя',
        'Select a theme':
        'Выберите тему оформления',
        'Back': 'Назад',
