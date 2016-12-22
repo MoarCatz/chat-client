@@ -1308,6 +1308,7 @@ class RegScreen(Screen):
         self.top_box.add_widget(self.to_login)
         self.add_widget(self.lb_usr)
         self.add_widget(self.tx_usr)
+        self.tx_usr.focus = True
         self.add_widget(self.lb_pass)
         self.add_widget(self.tx_pass)
         self.add_widget(self.lb_con)
@@ -1858,6 +1859,7 @@ class LoginScreen(Screen):
         self.top_box.add_widget(self.to_register)
         self.add_widget(self.lb_usr)
         self.add_widget(self.tx_usr)
+        self.tx_usr.focus = True
         self.add_widget(self.lb_pass)
         self.add_widget(self.tx_pass)
         self.add_widget(self.bt_next)
@@ -2082,6 +2084,9 @@ class AddPersonPopup(Popup):
             return []
 
         return [i for i in self.user_list if query in i[0]]
+
+    def on_open(self):
+        self.tx_nick.focus = True
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -2534,11 +2539,13 @@ class ChatApp(App):
         Window.size = (370, 200)
         self.screens.transition = self.no_trans
         self.screens.current = 'login'
+        self.login_scr.tx_usr.focus = True
 
     def to_register(self, bt = None):
         Window.size = (370, 240)
         self.screens.transition = self.no_trans
         self.screens.current = 'register'
+        self.register_scr.tx_usr.focus = True
 
     def to_self_profile(self, bt = None):
         self.back_action = self.back_to_screen
@@ -2590,6 +2597,7 @@ class ChatApp(App):
         d_scr = self.screens.get_screen(name)
         d_scr.status_bar.update_names(bt)
         d_scr.smile_bbl.build_btns()
+        d_scr.input_bar.msg_input.focus = True
 
         self.screens.current = self.person
 
