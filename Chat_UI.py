@@ -2083,7 +2083,7 @@ class AddPersonPopup(Popup):
         if self.user_list is None or not query:
             return []
 
-        return [i for i in self.user_list if query in i[0]]
+        return [i for i in self.user_list if query.lower() in i[0].lower()]
 
     def on_open(self):
         self.tx_nick.focus = True
