@@ -1814,7 +1814,10 @@ class LoginScreen(Screen):
             self.tx_pass.password = True
 
     def login(self, bt):
-        app.make_key_pair(callback = app.login)
+        if app.rs.pubkey is None:
+            app.make_key_pair(callback = app.login)
+        else:
+            app.login()
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

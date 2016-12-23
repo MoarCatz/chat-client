@@ -493,6 +493,8 @@ class RequestSender:
         self.conn = None
         self.server_key = None
         self.key_made = False
+        self.pubkey = None
+        self.privkey = None
 
         # Call _connect on the next I/O loop iteration
         self.ioloop.add_callback(self._connect)
