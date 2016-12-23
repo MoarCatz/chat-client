@@ -1,7 +1,7 @@
 <img src="https://avatars3.githubusercontent.com/u/21263910?v=3&s=100" alt="MoarCatz logo"
      title="MoarCatz" align="right" />
      
-# Chat-Client
+# Chat Client
 Simple desktop chat client written in Python.
 
 ## Getting Started
@@ -35,8 +35,8 @@ Coming later :zap:
 ## Features
 Simple yet powerful chat offers you to:
 
-* Chat with your frineds using encryption :lock:
-* Stay online when you want - we do not use a lot of bandwidth at your computer :metal:
+* Chat with your friends with all your data encrypted :lock:
+* Stay online whenever you want - we do not use a lot of bandwidth on your computer :metal:
 * Be up-to-date constantly thanks to the WebSocket protocol :hourglass_flowing_sand:
 
 ## Contributing
