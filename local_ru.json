@@ -7,6 +7,7 @@
   "Add a user": "Добавить пользователя в друзья",
   "Add to blacklist": "Заблокировать",
   "Add to favorites": "В избранные",
+  "An error occured when connecting to the server.\nPossible causes:\n• another session is opened from the same IP-address\n• no Internet connection\n• no response from the server\nPlease, restart the application": "Возникла ошибка при соединении с сервером. Возможные причины:\n• другая сессия открыта с этого IP-адреса\n• нет подключения к Интернету\n• сервер не отвечает\nПожалуйста, перезапустите приложение",
   "April": "Апреля",
   "Are you sure you want\nto delete your profile?\nThis action can't be undone": "Вы уверены, что хотите\n удалить свой профиль?\nЭто действие необратимо",
   "August": "Августа",

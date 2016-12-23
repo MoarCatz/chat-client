@@ -114,7 +114,13 @@ lcl = {'Sender': 'Отправитель',
        'Name': 'Имя',
        'Size': 'Размер',
        'About': 'О программе',
-       'Request Message': 'Сообщение запроса'}
+       'Request Message': 'Сообщение запроса',
+       'An error occured when connecting to the server.\nPossible '
+       'causes:\n• another session is opened from the same IP-'
+       'address\n• no Internet connection\n• no response from the '
+       'server\nPlease, restart the application': 'Возникла ошибка при соединении с сервером. Возможные причины:\n• другая сессия открыта с этого IP-адреса'
+       '\n• нет подключения к Интернету\n• сервер не отвечает\n'
+       'Пожалуйста, перезапустите приложение'}
 
 with open('local_ru.json', 'w') as f:
     json.dump(lcl, f, ensure_ascii = False, sort_keys = True, indent = 2)

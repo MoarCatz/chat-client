@@ -6,12 +6,12 @@ Config.set('graphics', 'width', 370)
 Config.set('graphics', 'height', 200)
 Config.set('graphics', 'resizable', False)
 
-import string, re, os, json, webbrowser
+import string, re, os, json, webbrowser, time, queue
 from datetime import datetime
-import time
 from PIL import Image as _Image
 from textwrap import TextWrapper
 from threading import Thread
+from functools import partial
 from io import BytesIO
 
 from kivy.app import App
@@ -45,7 +45,7 @@ from kivy.base import stopTouchApp, EventLoop
 from kivy.uix.filechooser import FileChooserListView, FileSystemLocal
 from kivy.uix.tabbedpanel import TabbedPanel, TabbedPanelHeader
 from kivy.uix.rst import RstDocument
-from kivy.atlas import Atlas
+from kivy.logger import Logger
 
 from client import RequestSender
 
@@ -532,7 +532,7 @@ class ClockLabel(Label):
 
 class Message(BoxLayout):
     bg_color = ListProperty([0.99, 0.99, 0.99, 1])
-    tw = TextWrapper(width = 20,
+    tw = TextWrapper(width = 30,
                      replace_whitespace = False)
     sent = (l['Sender'] + ': [color=#B6DAFF]{}[/color]\n' +
             l['Time'] + ': [color=#C8C8C8]{}[/color]\n' +
@@ -555,7 +555,8 @@ class Message(BoxLayout):
         spl = re.split('(\n{2,})', text)
         res = ''
         for idx, part in enumerate(spl):
-            if idx % 2 == 0:
+            if idx % 2 != 0:
+                # Elements with odd indexes are delimiters
                 res += part
             else:
                 res += '\n'.join(self.tw.fill(i) for i in part.split('\n'))
@@ -575,6 +576,9 @@ class Message(BoxLayout):
         self.time = tm
         self.scr = scr
 
+        #print(self.text_box.text.count('\n'))
+        #print(self.text_box.text)
+        #print(self.real_text)
         self.height = (self.text_box.text.count('\n') + 2) * 19
         self.add_widget(self.text_box)
 
@@ -1243,6 +1247,9 @@ class RegScreen(Screen):
             self.tx_pass.password = True
             self.tx_con.password = True
 
+    def register(self, bt):
+        app.make_key_pair(callback = app.register)
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.top_box = RegisterLayout(size_hint = (1, 0.125),
@@ -1298,7 +1305,7 @@ class RegScreen(Screen):
                               background_down = app.theme['down_intro'],
                               background_disabled_normal =
                               app.theme['disabled_intro'],
-                              on_release = app.register)
+                              on_release = self.register)
 
         self.show_psw = ShowPswdButton()
 
@@ -1335,12 +1342,15 @@ class ErrorDisp(Popup):
         self.lb = ErrorLabel(text = text,
                              font_size = 13,
                              color = (1, 1, 1, 1),
-                             size_hint = (0.95, 0.8),
-                             pos_hint = {"top": 0.99, "center_x": 0.5},
+                             size_hint_y = 2,
                              halign = "left",
                              valign = "top")
 
-        self.content.add_widget(self.lb)
+        self.scroll = ScrollView(size_hint = (0.95, 0.8),
+                             pos_hint = {"top": 0.98, "center_x": 0.5})
+
+        self.content.add_widget(self.scroll)
+        self.scroll.add_widget(self.lb)
         self.content.add_widget(self.btn)
         self.title = l['Error']
         self.height = 180
@@ -1803,6 +1813,9 @@ class LoginScreen(Screen):
             self.show_psw.text = ' ' + l['Show password']
             self.tx_pass.password = True
 
+    def login(self, bt):
+        app.make_key_pair(callback = app.login)
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.top_box = LoginLayout(size_hint = (1, 0.15),
@@ -1849,7 +1862,7 @@ class LoginScreen(Screen):
                               background_down = app.theme['down_intro'],
                               background_disabled_normal =
                               app.theme['disabled_intro'],
-                              on_release = app.login)
+                              on_release = self.login)
 
         self.show_psw = ShowPswdButton()
 
@@ -2156,7 +2169,9 @@ class DialogScreen(Screen):
         msgs = app.get_message_history(self.number,
                                        self.msg_layout.loaded + app.msg_amount)
         self.msg_grid.clear_widgets()
+        self.build_msgs(msgs)
 
+    def build_msgs(self, msgs):
         for message in msgs:
             text, tm, nick = message
             msg_row = MessageRow(text, tm, escape_markup(nick), self)
@@ -2437,10 +2452,6 @@ class DialogInputBar(BoxLayout):
         text = self.msg_input.text.strip('\n ')
         if text not in string.whitespace:
             self.add_msg(text, app.nick)
-            self.auto_response(text.upper())
-
-    def auto_response(self, text):
-        self.add_msg(text, app.person)
 
     def add_msg(self, text, nick):
         curr_time = int(time.time() * 100)
@@ -2513,6 +2524,10 @@ class ChatApp(App):
                    'Try something different']
     wrong_pswd = l['You entered a wrong password for this username. '
                    'Try again']
+    lost_conn = l['An error occured when connecting to the server.\nPossible '
+                  'causes:\n• another session is opened from the same IP-'
+                  'address\n• no Internet connection\n• no response from the '
+                  'server\nPlease, restart the application']
     users = [[('user1', True),
               ('user7', False)],
              [('user2', False)],
@@ -2662,15 +2677,13 @@ class ChatApp(App):
         if not id_match:
             return False
 
-        id_match, self.users = self.rs.get_friends_group()
-        if not id_match:
-            return False
-        self.menu_scr.build_usr_list(self.users)
+        self.get_user_groups()
 
         id_match, num = self.rs.create_dialog(name)
         if not id_match:
             return False
-        self.screens.add_widget(DialogScreen(number = num, name = name))
+        self.screens.add_widget(DialogScreen(number = int(num[0]),
+                                             name = name))
 
     def decline_request(self, name):
         id_match = self.rs.decline_add_request(name)
@@ -2718,7 +2731,8 @@ class ChatApp(App):
             if not id_match:
                 continue
 
-            self.screens.add_widget(DialogScreen(name = user, number = num))
+            self.screens.add_widget(DialogScreen(name = user,
+                                                 number = int(num[0])))
 
         users.insert(1, requests[0])
         users.insert(4, requests[1])
@@ -2730,6 +2744,16 @@ class ChatApp(App):
         if not id_match:
             return
         self.to_menu()
+
+    def make_key_pair(self, callback):
+        self.rs.ioloop.add_callback(self.rs.make_key_pair)
+        check = partial(self.check_key_progress, callback)
+        self.key_wait = Clock.schedule_interval(check, 0.5)
+
+    def check_key_progress(self, callback, tm):
+        if self.rs.key_made:
+            self.key_wait.cancel()
+            callback()
 
     def register(self, bt = None):
         if not re.match(self.nick_ptrn,
@@ -2791,6 +2815,7 @@ class ChatApp(App):
         self.to_menu()
 
     def logout(self, tm = None, request = True):
+        # The `tm` argument is only here because Clock passes it
         if request:
             id_match = self.rs.logout()
             if not id_match:
@@ -2846,12 +2871,37 @@ class ChatApp(App):
         id_match, history = self.rs.get_message_history(amount, dialog_number)
         if not id_match:
             return []
-        return history
+        return history[0]
 
     def open_settings(self):
         pass
 
+    def check_for_signals(self, tm):
+        try:
+            signal = self.rs.signals.get_nowait()
+            self._process_signal(signal)
+        except queue.Empty:
+            pass
+
+    def _process_signal(self, sig):
+        if sig == -1:
+            err = ErrorDisp(self.lost_conn)
+            err.bind(on_dismiss = lambda x: stopTouchApp())
+            err.open()
+        elif sig == 8:
+            scr = self.screens.get_screen(self.screens.current)
+            if isinstance(scr, DialogScreen):
+                amount = scr.msg_layout.loaded + 1
+                scr.msg_layout.loaded += 1
+                scr.build_msgs(self.get_message_history(scr.number, amount))
+        elif sig == 10:
+            self.get_user_groups()
+        else:
+            Logger.error('Client: Unknown signal {}, ignoring'.format(sig))
+
     def on_stop(self):
+        if self.screens.current not in ('register', 'login'):
+            self.logout()
         self.rs.ioloop.stop()
 
     def build(self):
@@ -2859,6 +2909,7 @@ class ChatApp(App):
 
         # Spin out a separate thread for communication with the server
         Thread(target = self.rs.run).start()
+        Clock.schedule_interval(self.check_for_signals, 0.5)
 
         Window.clearcolor = (0.71, 0.85, 1, 1)
         self.nick = ''

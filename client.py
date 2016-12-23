@@ -1,6 +1,6 @@
 from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado.websocket import websocket_connect
-from tornado.httpclient import AsyncHTTPClient, HTTPRequest
+from tornado.httpclient import AsyncHTTPClient, HTTPRequest, HTTPError
 from queue import Queue
 
 from hashlib import md5, sha256
@@ -107,13 +107,19 @@ class RequestSender:
     url = 'moarcatz-alexbagirov.c9users.io/'
     # Фиксированный URL сервера (без протокола, с обязятельным / на конце)
     response_queue = Queue()
+    signals = Queue()
     require_response = False
 
     async def _connect(self):
         """Устанавливает соединение с сервером по протоколу WSS"""
         req = HTTPRequest('wss://' + self.url,
-                          headers={'Connection': 'Keep-Alive'})
-        self.conn = await websocket_connect(req, io_loop = self.ioloop)
+                          headers = {'Connection': 'Keep-Alive'})
+        try:
+            self.conn = await websocket_connect(req, io_loop = self.ioloop)
+        except HTTPError:
+            self.signals.put(-1)
+            return
+
         self.server_key = await self._get_server_key()
 
         self.ioloop.add_callback(self._listen)
@@ -151,18 +157,24 @@ class RequestSender:
         while True:
             msg = await self.conn.read_message()
             if msg is None:
-                print("connection closed")
+                self.signals.put(-1)
+                self.conn = None
                 break
             if self.require_response:
                 self.response_queue.put(msg)
                 self.require_response = False
             else:
-                print(msg)
+                self.signals.put(int(msg))
 
     async def _send(self, code, req_id, *data):
         """Отправляет запрос с кодом code и данными data
         на сервер в зашифрованном виде вместе с подписью
         Возвращает статус обработки запроса и данные ответа сервера"""
+        if self.server_key is None or self.conn is None:
+            self.signals.put(-1)
+            self.response_queue.put(-1)
+            return
+
         request = self._pack(code, req_id, *data)
 
         key = os.urandom(32)
@@ -187,8 +199,14 @@ class RequestSender:
         коду запроса, возвращается False. Возвращается также соответствие ID
         запроса и ответа. Если ответ сервера имеет данные, они возвращаются.
         Если запрос О-типа, возвращается корректность запроса"""
+        if response == -1:
+            return None, None
         enc_resp, enc_key = map(b64decode, response.decode().split(':'))
-        key = rsa.decrypt(enc_key, self.privkey)
+        try:
+            key = rsa.decrypt(enc_key, self.privkey)
+        except rsa.pkcs1.DecryptionError:
+            self.signals.put(-1)
+            return None, None
 
         aes = pyaes.AESModeOfOperationCTR(key)
         resp = aes.decrypt(enc_resp)
@@ -209,10 +227,13 @@ class RequestSender:
             return req_id == resp_id
         return req_id == resp_id, resp_data
 
+    async def make_key_pair(self):
+        self.pubkey, self.privkey = rsa.newkeys(2048, accurate = False)
+        self.key_made = True
+
     def register(self, nick, pswd):
         """Создает новый аккаунт с данными входа nick, pswd
         Не возвращает данные"""
-        self.pubkey, self.privkey = rsa.newkeys(2048, accurate = False)
         key = ':'.join(map(str, self.pubkey.__getstate__()))
 
         pswd_hash = sha256(pswd.encode()).hexdigest()
@@ -227,7 +248,6 @@ class RequestSender:
     def login(self, nick, pswd):
         """Открывает новую сессию с данными входа nick, pswd
         Не возвращает данные"""
-        self.pubkey, self.privkey = rsa.newkeys(2048, accurate = False)
         key = ':'.join(map(str, self.pubkey.__getstate__()))
 
         pswd_hash = sha256(pswd.encode()).hexdigest()
@@ -263,7 +283,7 @@ class RequestSender:
         Возвращает сообщения в формате `(текст, время, отправитель)`"""
         req_id = self._request_id()
         self.ioloop.add_callback(self._send, cc.get_message_history, req_id,
-                                 count, user)
+                                 count, dialog)
         response = self.response_queue.get()
         id_match, msg_history = self._process(response, cc.get_message_history,
                                               req_id)
@@ -333,12 +353,15 @@ class RequestSender:
     def logout(self):
         """Закрывает активную сессию пользователя
         Не возвращает данные"""
+        if self.conn is None:
+            return False
         req_id = self._request_id()
         self.ioloop.add_callback(self._send, cc.logout, req_id)
         response = self.response_queue.get()
         id_match = self._process(response, cc.logout, req_id)
         if id_match:
             self.pubkey = self.privkey = None
+            self.key_made = False
             return True
         return False
 
@@ -469,9 +492,11 @@ class RequestSender:
         self.ioloop = IOLoop.current()
         self.conn = None
         self.server_key = None
+        self.key_made = False
 
         # Call _connect on the next I/O loop iteration
         self.ioloop.add_callback(self._connect)
+
 
     def run(self):
         self.ioloop.start()
