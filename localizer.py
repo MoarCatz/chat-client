@@ -120,7 +120,9 @@ lcl = {'Sender': 'Отправитель',
        'address\n• no Internet connection\n• no response from the '
        'server\nPlease, restart the application': 'Возникла ошибка при соединении с сервером. Возможные причины:\n• другая сессия открыта с этого IP-адреса'
        '\n• нет подключения к Интернету\n• сервер не отвечает\n'
-       'Пожалуйста, перезапустите приложение'}
+       'Пожалуйста, перезапустите приложение',
+       'Bo-o-o-oring...': 'Ску-у-у-учно...',
+       '(actually, just generating encryption keys)': '(на самом деле просто генерируются ключи шифрования)'}
 
 with open('local_ru.json', 'w') as f:
     json.dump(lcl, f, ensure_ascii = False, sort_keys = True, indent = 2)

@@ -12,6 +12,7 @@ from PIL import Image as _Image
 from textwrap import TextWrapper
 from threading import Thread
 from functools import partial
+from random import choice
 from io import BytesIO
 
 from kivy.app import App
@@ -1440,6 +1441,29 @@ class YesNoDialog(Popup):
         super().__init__()
 
 
+class LoadingScreen(Screen):
+    phrases = [l['Bo-o-o-oring...']]
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.phrase = Label(text = choice(self.phrases),
+                            pos_hint = {"top": 0.95, "center_x": 0.5},
+                            size_hint = (0.6, 0.1),
+                            color = (0, 0, 0, 1))
+        self.load = Image(source = 'themes/loading.gif',
+                          pos_hint = {"top": 0.7, "center_x": 0.5},
+                          size_hint = (0.5, 0.5),
+                          anim_delay = 0.0001)
+        self.actual = Label(text =
+                            l['(actually, just generating encryption keys)'],
+                            pos_hint = {"top": 0.1, "center_x": 0.5},
+                            size_hint = (0.5, 0.1),
+                            font_size = 11,
+                            color = (0, 0, 0, 1))
+        self.add_widget(self.phrase)
+        self.add_widget(self.load)
+        self.add_widget(self.actual)
+
+
 class LogoutDialog(YesNoDialog):
     def __init__(self):
         super().__init__(' ' + l['Log out'],
@@ -2749,6 +2773,7 @@ class ChatApp(App):
         self.to_menu()
 
     def make_key_pair(self, callback):
+        self.screens.current = 'loading'
         self.rs.ioloop.add_callback(self.rs.make_key_pair)
         check = partial(self.check_key_progress, callback)
         self.key_wait = Clock.schedule_interval(check, 0.5)
@@ -2771,6 +2796,7 @@ class ChatApp(App):
             return False
 
         if not status:
+            self.screens.current = 'register'
             ErrorDisp(self.nick_taken).open()
             return
 
@@ -2798,6 +2824,7 @@ class ChatApp(App):
             return False
 
         if not status:
+            self.screens.current = 'login'
             ErrorDisp(self.wrong_pswd).open()
             return
 
@@ -2939,6 +2966,7 @@ class ChatApp(App):
         self.profile_scr = Profile(name = "profile")
         self.settings_scr = SettingsScreen(name = "settings")
         self.help_scr = HelpScreen(name = "help")
+        self.load_scr = LoadingScreen(name = "loading")
 
         self.screens.add_widget(self.login_scr)
         self.screens.add_widget(self.register_scr)
@@ -2947,6 +2975,7 @@ class ChatApp(App):
         self.screens.add_widget(self.profile_scr)
         self.screens.add_widget(self.settings_scr)
         self.screens.add_widget(self.help_scr)
+        self.screens.add_widget(self.load_scr)
 
         return self.screens
 
