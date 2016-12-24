@@ -440,8 +440,9 @@ class RequestSender:
         времени между lower_tm и upper_tm
         Возвращает соообщения в формате `(текст, время, отправитель)`"""
         req_id = self._request_id()
-        response = self._send(cc.search_msg, req_id,
-                              dialog, text, lower_tm, upper_tm)
+        self.ioloop.add_callback(self._send, cc.search_msg, req_id,
+                                 dialog, text, lower_tm, upper_tm)
+        response = self.response_queue.get()
         id_match, search_results = self._process(response, cc.search_msg,
                                                  req_id)
         return id_match, search_results

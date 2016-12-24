@@ -66,6 +66,7 @@ Builder.load_string('''
     pos_hint: {"center_x": 0.5, "center_y": 0.5}
     width: 250
     separator_height: 1
+    separator_color: app.colors['light']
     title_font: "fonts/NotoSans_B.ttf"
 
 <AvatarSelectButton>:
@@ -132,7 +133,7 @@ Builder.load_string('''
 <LoginLayout>:
     canvas.before:
         Color:
-            rgba: 0.85, 0.92, 1, 1
+            rgba: app.colors['border']
         RoundedRectangle:
             pos: -28, 59
             size: 352, 42
@@ -140,7 +141,7 @@ Builder.load_string('''
             pos: -28, 109
             size: 352, 42
         Color:
-            rgba: 0.16, 0.36, 0.56, 1
+            rgba: app.colors['dark'] + (1,)
         RoundedRectangle:
             pos: -27, 60
             size: 350, 40
@@ -156,7 +157,7 @@ Builder.load_string('''
             pos: self.pos
             size: self.size
         Color:
-            rgba: 0.16, 0.36, 0.56, 1
+            rgba: app.colors['dark'] + (1,)
         Rectangle:
             pos: self.x, self.y + 1
             size: self.width, self.height - 2
@@ -233,7 +234,8 @@ Builder.load_string('''
 
 <NickLabel>:
     background_color: 0, 0, 0, 0
-    color: [0, 0, 0, 1] if self.state is 'normal' else [0.16, 0.36, 0.56, 1]
+    color: (0, 0, 0, 1) if self.state == 'normal' else\
+           app.colors['dark'] + (1,)
     size_hint_x: None
     width: self.texture_size[0]
     font_size: 13
@@ -295,7 +297,7 @@ Builder.load_string('''
             pos: self.pos
             size: self.size
         Color:
-            rgba: 0.16, 0.36, 0.56, 1
+            rgba: app.colors['dark'] + (1,)
         Rectangle:
             pos: self.x, self.y + 1
             size: self.width, self.height - 2
@@ -303,7 +305,7 @@ Builder.load_string('''
 <RegisterLayout>:
     canvas.before:
         Color:
-            rgba: 0.85, 0.92, 1, 1
+            rgba: app.colors['border']
         RoundedRectangle:
             pos: -28, 52
             size: 352, 45
@@ -314,7 +316,7 @@ Builder.load_string('''
             pos: -28, 153
             size: 352, 45
         Color:
-            rgba: 0.16, 0.36, 0.56, 1
+            rgba: app.colors['dark'] + (1,)
         RoundedRectangle:
             pos: -27, 53
             size: 350, 43
@@ -328,7 +330,7 @@ Builder.load_string('''
 <SmileBubble>:
     canvas:
         Color:
-            rgba: 0.16, 0.36, 0.56, 0.7
+            rgba: app.colors['dark'] + (0.7,)
         RoundedRectangle:
             pos: self.x, self.y + 10
             size: self.width, self.height - 10
@@ -346,7 +348,7 @@ Builder.load_string('''
 <UserRecord>:
     canvas:
         Color:
-            rgba: 0.16, 0.36, 0.56, 1
+            rgba: app.colors['dark'] + (1,)
         Line:
             points: self.x, self.y, \
                     self.x + self.width, self.y, \
@@ -354,7 +356,7 @@ Builder.load_string('''
                     self.x, self.y + self.height, \
                     self.x, self.y
         Color:
-            rgba: 0.16, 0.36, 0.56, 0.3
+            rgba: app.colors['dark'] + (0.3,)
         Rectangle:
             pos: self.pos
             size: self.size
@@ -464,7 +466,7 @@ class HelpScreen(Screen):
                                 tab_pos = 'bottom_left')
 
         with self.tabs.canvas:
-            Color(rgba = (0, 0.58, 1, 1))
+            Color(rgba = app.colors['tab'])
             Rectangle(size = (500, 1),
                       pos = (0, 22))
 
@@ -577,14 +579,11 @@ class Message(BoxLayout):
         self.time = tm
         self.scr = scr
 
-        #print(self.text_box.text.count('\n'))
-        #print(self.text_box.text)
-        #print(self.real_text)
         self.height = (self.text_box.text.count('\n') + 2) * 19
         self.add_widget(self.text_box)
 
         if sender != app.nick:
-            self.bg_color = [0.91, 0.95, 1, 1]
+            self.bg_color = app.colors['msg']
 
     def on_touch_down(self, touch):
         if self.collide_point(*touch.pos):
@@ -763,9 +762,9 @@ class ProfileField(TextInput):
         self.background_normal = app.theme['field']
         self.background_disabled_normal = app.theme['field']
         self.background_active = app.theme['field_active']
-        self.cursor_color = [0, 0, 0, 1]
-        self.selection_color = [0.18, 0.65, 0.83, 0.5]
-        self.disabled_foreground_color = [0, 0, 0, 1]
+        self.cursor_color = (0, 0, 0, 1)
+        self.selection_color = app.colors['light']
+        self.disabled_foreground_color = (0, 0, 0, 1)
         self.disabled = not scr.editing
 
 
@@ -945,7 +944,7 @@ class ProfilePage(FloatLayout):
                                        font_name = 'fonts/NotoSans_R.ttf',
                                        pos = (120, 430),
                                        font_size = 15,
-                                       background_color = [0, 0, 0, 0],
+                                       background_color = (0, 0, 0, 0),
                                        height = 35)
 
         self.status_lb = ProfileLabel(pos = (120, 410),
@@ -1215,6 +1214,8 @@ class ExtendedDatePicker(DatePicker):
         self.add_widget(self.hour)
         self.add_widget(self.minute)
         self.add_widget(self.second)
+        self.update_selectors(datetime.now().timestamp())
+        self.update_date()
 
 
 class ShowPswdButton(ToggleButton):
@@ -1451,8 +1452,8 @@ class LoadingScreen(Screen):
                             color = (0, 0, 0, 1))
         self.load = Image(source = 'themes/loading.gif',
                           pos_hint = {"top": 0.7, "center_x": 0.5},
-                          size_hint = (0.5, 0.5),
-                          anim_delay = 0.0001)
+                          size_hint = (0.4, 0.4),
+                          anim_delay = 0.001)
         self.actual = Label(text =
                             l['(actually, just generating encryption keys)'],
                             pos_hint = {"top": 0.1, "center_x": 0.5},
@@ -1968,11 +1969,12 @@ class SettingsTheme(Button):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.options = [l['Blue']]
+        self.options = [l['Blue'], l['Purple'], l['Green'],
+                        l['Pink'], l['Gray']]
         self.text = l[app.theme_name]
         self.background_color = (0, 0, 0, 0)
         self.selector = Popup(title = l['Select a theme'],
-                              size = (200, 250))
+                              size = (200, 350))
         self.selector.content = BoxLayout(orientation = 'vertical',
                                           padding = 10,
                                           spacing = 6)
@@ -2328,8 +2330,8 @@ class SearchMsgButton(Button):
         self.cont.from_picker.update_date()
         self.cont.to_picker.update_date()
 
-        l_tm = self.cont.from_picker.timestamp
-        u_tm = self.cont.to_picker.timestamp
+        l_tm = int(self.cont.from_picker.timestamp) * 100
+        u_tm = int(self.cont.to_picker.timestamp) * 100
         text = self.cont.text_to_search.text
         if l_tm > u_tm:
             ErrorDisp(l['The beginning time exceeds the end']).open()
@@ -2555,17 +2557,35 @@ class ChatApp(App):
                   'causes:\n• another session is opened from the same IP-'
                   'address\n• no Internet connection\n• no response from the '
                   'server\nPlease, restart the application']
-    users = [[('user1', True),
-              ('user7', False)],
-             [('user2', False)],
-             [('user3', True)],
-             [('user4', False)],
-             [('user5', True)],
-             [('user6', False)]]
     profiles = {}
     msg_amount = 50
     language = StringProperty('English')
     theme_name = StringProperty(l['Blue'])
+    colors_from = {'purple': {'light': (0.83, 0.83, 0.9, 1),
+                              'dark': (0.31, 0.31, 0.44),
+                              'tab': (0.74, 0.54, 0.9, 1),
+                              'msg': (0.95, 0.91, 1, 1),
+                              'border': (0.96, 0.85, 1, 1)},
+                   'blue': {'light': (0.71, 0.85, 1, 1),
+                            'dark': (0.16, 0.36, 0.56),
+                            'tab': (0, 0.58, 1, 1),
+                            'msg': (0.91, 0.95, 1, 1),
+                            'border': (0.85, 0.92, 1, 1)},
+                   'green': {'light': (0.79, 0.91, 0.76, 1),
+                             'dark': (0.16, 0.53, 0.35),
+                             'tab': (0.38, 0.77, 0.32, 1),
+                             'msg': (0.91, 1, 0.91, 1),
+                             'border': (0.85, 1, 0.87, 1)},
+                   'pink': {'light': (1, 0.89, 0.83, 1),
+                            'dark': (0.8, 0.55, 0.55),
+                            'tab': (1, 0.59, 0.53, 1),
+                            'msg': (1, 0.91, 0.99, 1),
+                            'border': (1, 0.85, 0.98, 1)},
+                   'gray': {'light': (0.92, 0.92, 0.89, 1),
+                            'dark': (0.38, 0.4, 0.41),
+                            'tab': (0.31, 0.31, 0.32, 1),
+                            'msg': (0.91, 0.91, 0.91, 1),
+                            'border': (0.88, 0.88, 0.88, 1)}}
 
     def back_to_search(self, bt = None):
         self.screens.current = 'menu'
@@ -2871,7 +2891,7 @@ class ChatApp(App):
         id_match, search_results = self.rs.search_msg(dialog, text, l_tm, u_tm)
         if not id_match:
             return []
-        return search_results
+        return search_results[0]
 
     def send_message(self, text, tm, dialog):
         return self.rs.send_message(text, tm, dialog)
@@ -2941,7 +2961,6 @@ class ChatApp(App):
         Thread(target = self.rs.run).start()
         Clock.schedule_interval(self.check_for_signals, 0.5)
 
-        Window.clearcolor = (0.71, 0.85, 1, 1)
         self.nick = ''
         self.person = ''
 
@@ -2950,6 +2969,9 @@ class ChatApp(App):
         self.language = self.settings['lang']
         self.theme_name = self.settings['thm']
         self.theme = TextureResolver('themes/' + self.theme_name.lower())
+        self.colors = self.colors_from[self.theme_name.lower()]
+
+        Window.clearcolor = self.colors['light']
 
         self.return_scr = 'menu'
         self.back_action = self.back_to_screen
