@@ -126,7 +126,12 @@ lcl = {'Sender': 'Отправитель',
        '\n• нет подключения к Интернету\n• сервер не отвечает\n'
        'Пожалуйста, перезапустите приложение',
        'Bo-o-o-oring...': 'Ску-у-у-учно...',
-       '(actually, just generating encryption keys)': '(на самом деле просто генерируются ключи шифрования)'}
+       '(actually, just generating encryption keys)': '(на самом деле просто генерируются ключи шифрования)',
+       'The password you entered is too weak\n'
+       'It should meet the following requirements:\n'
+       '• It must be at least 8 characters long\n'
+       '• It must contain a number and a letter': 'Вы ввели слишком простой пароль\nВаш пароль должен удовлетворять следующим критериям:\n'
+       '• Он должен быть не короче 8 символов\n• Он должен содержать букву и цифру'}
 
 with open('local_ru.json', 'w') as f:
     json.dump(lcl, f, ensure_ascii = False, sort_keys = True, indent = 2)

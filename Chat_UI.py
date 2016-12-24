@@ -1233,6 +1233,10 @@ class ShowPswdButton(ToggleButton):
 
 
 class RegScreen(Screen):
+    weak_pswd = l['The password you entered is too weak\n'
+                  'It should meet the following requirements:\n'
+                  '• It must be at least 8 characters long\n'
+                  '• It must contain a number and a letter']
     def check_next(self):
         usr = self.tx_usr.text
         psw = self.tx_pass.text
@@ -1249,7 +1253,23 @@ class RegScreen(Screen):
             self.tx_pass.password = True
             self.tx_con.password = True
 
+    def strong(self, pswd):
+        if len(pswd) < 8:
+            return False
+        let = False
+        num = False
+        for i in pswd:
+            if i.isalpha():
+                let = True
+            elif i.isdigit():
+                num = True
+        return let and num
+
     def register(self, bt):
+        pswd = self.tx_pass.text
+        if not self.strong(pswd):
+            ErrorDisp(self.weak_pswd).open()
+            return
         app.make_key_pair(callback = app.register)
 
     def __init__(self, **kwargs):
@@ -1450,10 +1470,9 @@ class LoadingScreen(Screen):
                             pos_hint = {"top": 0.95, "center_x": 0.5},
                             size_hint = (0.6, 0.1),
                             color = (0, 0, 0, 1))
-        self.load = Image(source = 'themes/loading.gif',
-                          pos_hint = {"top": 0.7, "center_x": 0.5},
+        self.load = Image(pos_hint = {"top": 0.7, "center_x": 0.5},
                           size_hint = (0.4, 0.4),
-                          anim_delay = 0.001)
+                          anim_delay = 0.01)
         self.actual = Label(text =
                             l['(actually, just generating encryption keys)'],
                             pos_hint = {"top": 0.1, "center_x": 0.5},
@@ -2664,9 +2683,13 @@ class ChatApp(App):
         self.screens.current = self.person
 
     def add_favs(self, name, status):
+        for _name, _status in self.users[0]:
+            if name == _name:
+                return
+
         id_match = self.rs.add_to_favorites(name)
         if not id_match:
-            return False
+            return
 
         self.users[0].append((name, status))
         self.menu_scr.build_usr_list(self.users)
@@ -2793,6 +2816,7 @@ class ChatApp(App):
         self.to_menu()
 
     def make_key_pair(self, callback):
+        self.load_scr.load.source = 'themes/loading.gif'
         self.screens.current = 'loading'
         self.rs.ioloop.add_callback(self.rs.make_key_pair)
         check = partial(self.check_key_progress, callback)

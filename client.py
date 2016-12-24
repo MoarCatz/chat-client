@@ -454,7 +454,7 @@ class RequestSender:
         self.ioloop.add_callback(self._send, cc.remove_from_favorites, req_id,
                                  user)
         response = self.response_queue.get()
-        id_match = self._process(response, cc.remove_from_favorites,)
+        id_match = self._process(response, cc.remove_from_favorites, req_id)
         return id_match
 
     def get_add_requests(self):

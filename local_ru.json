@@ -83,6 +83,7 @@
   "Take back": "Отменить",
   "Text to search...": "Фраза для поиска...",
   "The beginning time exceeds the end": "Начальное время превосходит конечное",
+  "The password you entered is too weak\nIt should meet the following requirements:\n• It must be at least 8 characters long\n• It must contain a number and a letter": "Вы ввели слишком простой пароль\nВаш пароль должен удовлетворять следующим критериям:\n• Он должен быть не короче 8 символов\n• Он должен содержать букву и цифру",
   "The selected file should be a PNG image": "Выбранный файл должен быть PNG картинкой",
   "The username you entered is incorrect. It should only consist of letters and spaces, it cannot consist of spaces only and must be 2 to 15 characters long": "Введен недопустимый логин. Он не может состоять из пробелов и должен быть от 2 до 15 символов в длину",
   "There is already a user with the username you entered. Try something different": "Этот логин уже занят. Попробуйте другой",
