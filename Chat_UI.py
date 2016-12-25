@@ -38,9 +38,9 @@ from kivy.utils import escape_markup
 from kivy.uix.dropdown import DropDown
 from kivy.uix.togglebutton import ToggleButton
 from kivy.uix.spinner import Spinner, SpinnerOption
-from kivy.clock import Clock
+from kivy.clock import Clock, mainthread
 from kivy.graphics import Ellipse, Color, Rectangle
-from kivy.uix.image import Image
+from kivy.uix.image import Image, AsyncImage
 from kivy.core.image import Image as CoreImage
 from kivy.base import stopTouchApp, EventLoop
 from kivy.uix.filechooser import FileChooserListView, FileSystemLocal
@@ -1462,26 +1462,63 @@ class YesNoDialog(Popup):
         super().__init__()
 
 
-class LoadingScreen(Screen):
-    phrases = [l['Bo-o-o-oring...']]
+class LoadingPopup(Popup):
+    def render_image(self):
+        self.load = AsyncImage(pos_hint = {"top": 0.8, "center_x": 0.5},
+                               size_hint = (0.7, 0.7),
+                               source = 'themes/loading.gif',
+                               anim_delay = 0.01)
+        self.content.add_widget(self.load)
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.phrase = Label(text = choice(self.phrases),
-                            pos_hint = {"top": 0.95, "center_x": 0.5},
-                            size_hint = (0.6, 0.1),
-                            color = (0, 0, 0, 1))
-        self.load = Image(pos_hint = {"top": 0.7, "center_x": 0.5},
-                          size_hint = (0.4, 0.4),
-                          anim_delay = 0.01)
+        Thread(target = self.render_image).start()
+        self.content = FloatLayout()
+        self.title = 'Loading...'
+        self.height = 150
+        self.width = 150
+        self.auto_dismiss = False
+
+
+class LoadingScreen(Screen):
+    phrases = [l["Upgrading Windows, your PC will restart several times"],
+               l["Please wait, the bits are breeding"],
+               l["Please wait, the little elves are drawing your window"],
+               l["Testing your patience"],
+               l["Waiting for the satellite to move into position"],
+               l["[color=#FFE800]INSERT COIN[/color]"],
+               l["Counting to infinity"],
+               l["Please wait, we're making you a cookie"],
+               l["Convincing AI not to take over the world"],
+               l["Computing the answer to life, the universe, and everything"],
+               l["Trying to sort in O(n)"],
+               l["Making sure all the i's have dots"],
+               l["Cleaning off the cobwebs"]]
+
+    def on_enter(self):
+        self.phrase.text = choice(self.phrases)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.layout = BoxLayout(orientation = 'vertical')
+        self.phrase = FullSizeLabel(size_hint = (1, 0.3),
+                                    halign = 'center',
+                                    valign = 'center',
+                                    markup = True,
+                                    color = (0, 0, 0, 1))
+        self.load = AsyncImage(size_hint = (0.4, 0.4),
+                               pos_hint = {"center_x": 0.5},
+                               anim_delay = 0.01)
         self.actual = Label(text =
                             l['(actually, just generating encryption keys)'],
-                            pos_hint = {"top": 0.1, "center_x": 0.5},
-                            size_hint = (0.5, 0.1),
+                            size_hint = (1, 0.1),
                             font_size = 11,
                             color = (0, 0, 0, 1))
-        self.add_widget(self.phrase)
-        self.add_widget(self.load)
-        self.add_widget(self.actual)
+        self.add_widget(self.layout)
+        self.layout.add_widget(self.phrase)
+        self.layout.add_widget(self.load)
+        self.layout.add_widget(Widget(size_hint = (1, 0.1)))
+        self.layout.add_widget(self.actual)
 
 
 class LogoutDialog(YesNoDialog):
@@ -2220,6 +2257,7 @@ class DialogScreen(Screen):
         self.build_msgs(msgs)
 
     def build_msgs(self, msgs):
+        self.msg_layout.loaded = len(msgs)
         for message in msgs:
             text, tm, nick = message
             msg_row = MessageRow(text, tm, escape_markup(nick), self)
@@ -2466,6 +2504,7 @@ class MessageRow(BoxLayout):
     def __init__(self, text, tm, sender, scr, **kwargs):
         super().__init__(**kwargs)
         self.scr = scr
+        self.spacing = 1
 
         self.msg = Message(text, tm, sender, scr,
                            size_hint = (0.7, 1))
@@ -2648,21 +2687,20 @@ class ChatApp(App):
         self.screens.current = 'menu'
 
     def to_profile(self, nick, return_scr):
-        self.get_profile_info(nick)
-        if return_scr == 'search':
-            self.back_action = self.back_to_search
-            p = self.menu_scr.add_person_popup
-            p.keep_text = True
-            p.dismiss()
-            p.keep_text = False
-        else:
-            self.back_action = self.back_to_screen
-            self.return_scr = return_scr
+        Thread(target = self.get_profile_info, args = (nick,),
+               kwargs = {'switch': True}).start()
+        self.return_scr = return_scr
+        self.load_popup.open()
+
+    @mainthread
+    def profile_switch(self, nick):
+        self.back_action = self.back_to_screen
 
         self.profile_scr.profile_bar.back_bt.on_release = self.back_action
 
         Window.size = (350, 500)
         self.profile_scr.set_up_for(nick)
+        self.load_popup.dismiss()
         self.screens.current = 'profile'
 
     def to_settings(self, bt = None):
@@ -2676,6 +2714,9 @@ class ChatApp(App):
         name = bt.text
         self.person = name
         d_scr = self.screens.get_screen(name)
+        msgs = app.get_message_history(d_scr.number, app.msg_amount)
+        d_scr.build_msgs(msgs)
+
         d_scr.status_bar.update_names(bt)
         d_scr.smile_bbl.build_btns()
         d_scr.input_bar.msg_input.focus = True
@@ -2920,13 +2961,15 @@ class ChatApp(App):
     def send_message(self, text, tm, dialog):
         return self.rs.send_message(text, tm, dialog)
 
-    def get_profile_info(self, nick):
+    def get_profile_info(self, nick, switch = False):
         id_match, profile_info = self.rs.get_profile_info(nick)
         if not id_match:
             return
 
         data = ProfileData(nick, *profile_info)
         self.profiles[nick] = data
+        if switch:
+            self.profile_switch(nick)
 
     def change_profile_section(self, sect, chg):
         return self.rs.change_profile_section(sect, chg)
@@ -3013,6 +3056,8 @@ class ChatApp(App):
         self.settings_scr = SettingsScreen(name = "settings")
         self.help_scr = HelpScreen(name = "help")
         self.load_scr = LoadingScreen(name = "loading")
+
+        self.load_popup = LoadingPopup()
 
         self.screens.add_widget(self.login_scr)
         self.screens.add_widget(self.register_scr)

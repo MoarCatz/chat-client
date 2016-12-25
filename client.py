@@ -164,7 +164,12 @@ class RequestSender:
                 self.response_queue.put(msg)
                 self.require_response = False
             else:
-                self.signals.put(int(msg))
+                try:
+                    self.signals.put(int(msg))
+                except ValueError:
+                    self.signals.put(-1)
+                    self.conn = None
+                    break
 
     async def _send(self, code, req_id, *data):
         """Отправляет запрос с кодом code и данными data
@@ -380,9 +385,7 @@ class RequestSender:
         req_id = self._request_id()
         self.ioloop.add_callback(self._send, cc.get_profile_info, req_id, user)
         response = self.response_queue.get()
-        id_match, data = self._process(response,
-                                       cc.get_profile_info,
-                                       req_id)
+        id_match, data = self._process(response, cc.get_profile_info, req_id)
         *profile_info, img = data
         profile_info.append(b64decode(img))
         return id_match, profile_info

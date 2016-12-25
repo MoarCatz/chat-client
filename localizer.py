@@ -125,13 +125,25 @@ lcl = {'Sender': 'Отправитель',
        'server\nPlease, restart the application': 'Возникла ошибка при соединении с сервером. Возможные причины:\n• другая сессия открыта с этого IP-адреса'
        '\n• нет подключения к Интернету\n• сервер не отвечает\n'
        'Пожалуйста, перезапустите приложение',
-       'Bo-o-o-oring...': 'Ску-у-у-учно...',
        '(actually, just generating encryption keys)': '(на самом деле просто генерируются ключи шифрования)',
        'The password you entered is too weak\n'
        'It should meet the following requirements:\n'
        '• It must be at least 8 characters long\n'
        '• It must contain a number and a letter': 'Вы ввели слишком простой пароль\nВаш пароль должен удовлетворять следующим критериям:\n'
-       '• Он должен быть не короче 8 символов\n• Он должен содержать букву и цифру'}
+       '• Он должен быть не короче 8 символов\n• Он должен содержать букву и цифру',
+       "Upgrading Windows, your PC will restart several times": 'Обновляем Windows, ваш компьютер несколько раз перезагрузится',
+       "Please wait, the bits are breeding": 'Пожалуйста, подождите, биты размножаются',
+       "Please wait, the little elves are drawing your window": 'Пожалуйста, подождите, маленькие эльфы рисуют ваше окно',
+       "Testing your patience": 'Проверяем ваше терпение',
+       "Waiting for the satellite to move into position": 'Ждем, пока спутник встанет на свое место',
+       "[color=#FFE800]INSERT COIN[/color]": '[color=#FFE800]ВСТАВЬТЕ МОНЕТКУ[/color]',
+       "Counting to infinity": 'Считаем до бесконечности',
+       "Please wait, we're making you a cookie": 'Пожалуйста, подождите, мы печем вам печеньку',
+       "Convincing AI not to take over the world": 'Убеждаем ИИ не захватывать мир',
+       "Computing the answer to life, the universe, and everything": 'Считаем ответ на главный вопрос жизни, вселенной и всего такого',
+       "Trying to sort in O(n)": 'Пытаемся отсортировать за O(n)',
+       "Making sure all the i's have dots": 'Убеждаемся, что у всех i есть точки',
+       "Cleaning off the cobwebs": 'Счищаем паутину'}
 
 with open('local_ru.json', 'w') as f:
     json.dump(lcl, f, ensure_ascii = False, sort_keys = True, indent = 2)
