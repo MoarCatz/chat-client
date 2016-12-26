@@ -31,7 +31,7 @@ from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.bubble import Bubble
 from kivy.properties import (ListProperty, BooleanProperty,
-                             StringProperty, ObjectProperty)
+                             StringProperty, ObjectProperty, NumericProperty)
 from kivy.uix.popup import Popup
 from kivy.uix.boxlayout import BoxLayout
 from kivy.utils import escape_markup
@@ -47,6 +47,7 @@ from kivy.uix.filechooser import FileChooserListView, FileSystemLocal
 from kivy.uix.tabbedpanel import TabbedPanel, TabbedPanelHeader
 from kivy.uix.rst import RstDocument
 from kivy.logger import Logger
+from kivy.animation import Animation
 
 from client import RequestSender
 
@@ -125,6 +126,16 @@ Builder.load_string('''
     background_normal: app.theme['inputbt_normal']
     background_down: app.theme['inputbt_down']
     font_name: 'fonts/NotoSans_B.ttf'
+
+<LoadSpinner>:
+    canvas.before:
+        PushMatrix
+        Rotate:
+            angle: root.angle
+            axis: 0, 0, 1
+            origin: root.center
+    canvas.after:
+        PopMatrix
 
 <LoggedAsLabel>:
     text_size: self.width - 10, self.height
@@ -1265,7 +1276,7 @@ class RegScreen(Screen):
                 num = True
         return let and num
 
-    def register(self, bt):
+    def register(self, bt = None):
         pswd = self.tx_pass.text
         if not self.strong(pswd):
             ErrorDisp(self.weak_pswd).open()
@@ -1432,7 +1443,8 @@ class YesNoDialog(Popup):
     def ch_no(self, bt):
         self.dismiss()
 
-    def __init__(self, title, question):
+    def __init__(self, title, question, **kwargs):
+        super().__init__(**kwargs)
         box = BoxLayout(orientation = "vertical")
         self.height = 200
         self.title = title
@@ -1459,21 +1471,31 @@ class YesNoDialog(Popup):
         answers.add_widget(no)
 
         self.content = box
-        super().__init__()
+
+
+class LoadSpinner(Image):
+    angle = NumericProperty(0)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.source = 'themes/loading.png'
+        self.anim_delay = 0.01
+        anim = Animation(angle = 360, duration=1)
+        anim += Animation(angle = 360, duration=1)
+        anim.repeat = True
+        anim.start(self)
+
+    def on_angle(self, inst, angle):
+        if angle == 360:
+            inst.angle = 0
 
 
 class LoadingPopup(Popup):
-    def render_image(self):
-        self.load = AsyncImage(pos_hint = {"top": 0.8, "center_x": 0.5},
-                               size_hint = (0.7, 0.7),
-                               source = 'themes/loading.gif',
-                               anim_delay = 0.01)
-        self.content.add_widget(self.load)
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        Thread(target = self.render_image).start()
         self.content = FloatLayout()
+        self.load = LoadSpinner(pos_hint = {"top": 0.8, "center_x": 0.5},
+                                size_hint = (0.7, 0.7))
+        self.content.add_widget(self.load)
         self.title = 'Loading...'
         self.height = 150
         self.width = 150
@@ -1486,7 +1508,7 @@ class LoadingScreen(Screen):
                l["Please wait, the little elves are drawing your window"],
                l["Testing your patience"],
                l["Waiting for the satellite to move into position"],
-               l["[color=#FFE800]INSERT COIN[/color]"],
+               l["[color=#FFBD33]INSERT COIN[/color]"],
                l["Counting to infinity"],
                l["Please wait, we're making you a cookie"],
                l["Convincing AI not to take over the world"],
@@ -1506,9 +1528,8 @@ class LoadingScreen(Screen):
                                     valign = 'center',
                                     markup = True,
                                     color = (0, 0, 0, 1))
-        self.load = AsyncImage(size_hint = (0.4, 0.4),
-                               pos_hint = {"center_x": 0.5},
-                               anim_delay = 0.01)
+        self.load = LoadSpinner(size_hint = (0.5, 0.5),
+                                pos_hint = {"center_x": 0.5})
         self.actual = Label(text =
                             l['(actually, just generating encryption keys)'],
                             size_hint = (1, 0.1),
@@ -1894,7 +1915,7 @@ class LoginScreen(Screen):
             self.show_psw.text = ' ' + l['Show password']
             self.tx_pass.password = True
 
-    def login(self, bt):
+    def login(self, bt = None):
         if app.rs.pubkey is None:
             app.make_key_pair(callback = app.login)
         else:
@@ -2337,9 +2358,6 @@ class DialogButtonBar(BoxLayout):
         self.opts_drop.dismiss()
         SearchMsgPopup(self.scr).open()
 
-    def delete_dialog(self, bt):
-        app.delete_dialog(self.scr.number)
-
     def __init__(self, scr, **kwargs):
         super().__init__(**kwargs)
         self.scr = scr
@@ -2367,8 +2385,6 @@ class DialogButtonBar(BoxLayout):
                                        on_release = scr.load_more)
         self.search_bt = DialogOptButton('', l['Search for messages'], 2,
                                          on_release = self.search_msg)
-        self.delete_bt = DialogOptButton('  ', l['Delete dialog'], 9 - 2*off,
-                                         on_release = self.delete_dialog)
 
         self.opts_drop.add_widget(self.load_bt)
         self.opts_drop.add_widget(self.search_bt)
@@ -2535,7 +2551,7 @@ class DialogInputBar(BoxLayout):
             self.scr.remove_widget(self.scr.smile_bbl)
             self.scr.smile_bbl.hidden = True
 
-    def send_msg(self, bt):
+    def send_msg(self, bt = None):
         text = self.msg_input.text.strip('\n ')
         if text not in string.whitespace:
             self.add_msg(text, app.nick)
@@ -2850,14 +2866,7 @@ class ChatApp(App):
         self.users = users
         self.menu_scr.build_usr_list(users)
 
-    def delete_dialog(self, number):
-        id_match = self.rs.delete_dialog(number)
-        if not id_match:
-            return
-        self.to_menu()
-
     def make_key_pair(self, callback):
-        self.load_scr.load.source = 'themes/loading.gif'
         self.screens.current = 'loading'
         self.rs.ioloop.add_callback(self.rs.make_key_pair)
         check = partial(self.check_key_progress, callback)
@@ -3016,12 +3025,26 @@ class ChatApp(App):
         else:
             Logger.error('Client: Unknown signal {}, ignoring'.format(sig))
 
+    def key_pressed(self, window, char, keycode, text, modifiers):
+        scr_name = self.screens.current
+        scr = self.screens.get_screen(scr_name)
+        if keycode == 40:
+            # If the `Enter` key has been pressed
+            if scr_name == 'login':
+                self.login_scr.login()
+            elif scr_name == 'register':
+                self.register_scr.register()
+            elif isinstance(scr, DialogScreen) and modifiers == ['shift']:
+                scr.input_bar.send_msg()
+                scr.input_bar.msg_input.text = ''
+
     def on_stop(self):
-        if self.screens.current not in ('register', 'login'):
+        if self.screens.current not in ('register', 'login', 'loading'):
             self.logout()
         self.rs.ioloop.stop()
 
     def build(self):
+        Window.bind(on_key_down = self.key_pressed)
         self.rs = RequestSender()
 
         # Spin out a separate thread for communication with the server

@@ -206,7 +206,11 @@ class RequestSender:
         Если запрос О-типа, возвращается корректность запроса"""
         if response == -1:
             return None, None
-        enc_resp, enc_key = map(b64decode, response.decode().split(':'))
+        try:
+            enc_resp, enc_key = map(b64decode, response.decode().split(':'))
+        except ValueError:
+            self.signals.put(-1)
+            return None, None
         try:
             key = rsa.decrypt(enc_key, self.privkey)
         except rsa.pkcs1.DecryptionError:
